@@ -12,24 +12,23 @@ int client_list::set_user_name(int fd_num, const char* user_name)
 {
     std::lock_guard<std::mutex> guard(client_mutext);
 
-    bool is_exit = false;
-
+    bool is_exist = false;
     for (unsigned long i=0; i< client_list.size(); i++)
     {
         if (!strcmp(client_list[i].user_name, user_name))
         {
             close(client_list[i].num_socket);
             client_list[i].num_socket = fd_num;
-            is_exit = true;
+            is_exist = true;
         };
     };
 
 
     for (unsigned long i=0; i< client_list.size(); i++)
     {
-        if (client_list[i].num_socket == fd_num)
+        if ((client_list[i].num_socket == fd_num) && strcmp(client_list[i].user_name, user_name))
         {
-            if (is_exit){
+            if (is_exist){
                 client_list.erase(client_list.begin()+static_cast<long>(i));
             }else{
                 strcpy(client_list[i].user_name,user_name);

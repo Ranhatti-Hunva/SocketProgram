@@ -19,9 +19,11 @@
 #include <fcntl.h>
 
 #include "clientmanager.h"
+#include "msgqueue.h"
 
 class TCPhelper {
 protected:
+    std::mutex fd_set_mutex;
     fd_set master;
     int fd_max;
 
@@ -45,12 +47,23 @@ public:
 
 class TCPserver:public TCPhelper
 {
+    std::vector<int> client_fds;
 public:
+    TCPserver():TCPhelper()
+    {
+        client_fds.clear();
+    }
     // Make a server socket TCP/IP
     int server_echo(int port_num);
 
     // Acceptor for a new client connection
-    int acceptor(int server_fd, std::vector<int>& input_fds, fd_set& master,int& fdmax, client_list& client_socket_list);
+    int acceptor(int server_fd, client_list& client_socket_list);
+
+    // Reciver for a msg from client.
+    int reciver(int server_fd, client_list& client_socket_list,msg_queue& msg_wts);
+
+    // Close socket.
+    void closer(int server_fd, client_list& client_socket_list);
 };
 
 #endif // TCPHELPER_H

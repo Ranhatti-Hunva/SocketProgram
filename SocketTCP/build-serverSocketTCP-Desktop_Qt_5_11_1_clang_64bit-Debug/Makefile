@@ -53,13 +53,13 @@ OBJECTS_DIR   = ./
 SOURCES       = ../serverSocketTCP/main.cpp \
 		../serverSocketTCP/clientmanager.cpp \
 		../serverSocketTCP/iosocket.cpp \
-		../serverSocketTCP/usercommand.cpp \
-		../serverSocketTCP/tcphelper.cpp 
+		../serverSocketTCP/tcphelper.cpp \
+		../serverSocketTCP/msgqueue.cpp 
 OBJECTS       = main.o \
 		clientmanager.o \
 		iosocket.o \
-		usercommand.o \
-		tcphelper.o
+		tcphelper.o \
+		msgqueue.o
 DIST          = /Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/spec_pre.prf \
 		/Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/qdevice.pri \
 		/Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/device_config.prf \
@@ -225,12 +225,12 @@ DIST          = /Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/spec_pre.prf
 		/Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/lex.prf \
 		../serverSocketTCP/serverSocketTCP.pro ../serverSocketTCP/clientmanager.h \
 		../serverSocketTCP/iosocket.h \
-		../serverSocketTCP/usercommand.h \
-		../serverSocketTCP/tcphelper.h ../serverSocketTCP/main.cpp \
+		../serverSocketTCP/tcphelper.h \
+		../serverSocketTCP/msgqueue.h ../serverSocketTCP/main.cpp \
 		../serverSocketTCP/clientmanager.cpp \
 		../serverSocketTCP/iosocket.cpp \
-		../serverSocketTCP/usercommand.cpp \
-		../serverSocketTCP/tcphelper.cpp
+		../serverSocketTCP/tcphelper.cpp \
+		../serverSocketTCP/msgqueue.cpp
 QMAKE_TARGET  = serverSocketTCP
 DESTDIR       = 
 TARGET        = serverSocketTCP
@@ -593,8 +593,8 @@ distdir: FORCE
 	@test -d $(DISTDIR) || mkdir -p $(DISTDIR)
 	$(COPY_FILE) --parents $(DIST) $(DISTDIR)/
 	$(COPY_FILE) --parents /Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/data/dummy.cpp $(DISTDIR)/
-	$(COPY_FILE) --parents ../serverSocketTCP/clientmanager.h ../serverSocketTCP/iosocket.h ../serverSocketTCP/usercommand.h ../serverSocketTCP/tcphelper.h $(DISTDIR)/
-	$(COPY_FILE) --parents ../serverSocketTCP/main.cpp ../serverSocketTCP/clientmanager.cpp ../serverSocketTCP/iosocket.cpp ../serverSocketTCP/usercommand.cpp ../serverSocketTCP/tcphelper.cpp $(DISTDIR)/
+	$(COPY_FILE) --parents ../serverSocketTCP/clientmanager.h ../serverSocketTCP/iosocket.h ../serverSocketTCP/tcphelper.h ../serverSocketTCP/msgqueue.h $(DISTDIR)/
+	$(COPY_FILE) --parents ../serverSocketTCP/main.cpp ../serverSocketTCP/clientmanager.cpp ../serverSocketTCP/iosocket.cpp ../serverSocketTCP/tcphelper.cpp ../serverSocketTCP/msgqueue.cpp $(DISTDIR)/
 
 
 clean: compiler_clean 
@@ -646,7 +646,7 @@ compiler_clean: compiler_moc_predefs_clean
 
 main.o: ../serverSocketTCP/main.cpp ../serverSocketTCP/clientmanager.h \
 		../serverSocketTCP/iosocket.h \
-		../serverSocketTCP/usercommand.h \
+		../serverSocketTCP/msgqueue.h \
 		../serverSocketTCP/tcphelper.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o main.o ../serverSocketTCP/main.cpp
 
@@ -655,15 +655,18 @@ clientmanager.o: ../serverSocketTCP/clientmanager.cpp ../serverSocketTCP/clientm
 
 iosocket.o: ../serverSocketTCP/iosocket.cpp ../serverSocketTCP/iosocket.h \
 		../serverSocketTCP/clientmanager.h \
-		../serverSocketTCP/usercommand.h
+		../serverSocketTCP/msgqueue.h \
+		../serverSocketTCP/tcphelper.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o iosocket.o ../serverSocketTCP/iosocket.cpp
 
-usercommand.o: ../serverSocketTCP/usercommand.cpp ../serverSocketTCP/usercommand.h
-	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o usercommand.o ../serverSocketTCP/usercommand.cpp
-
 tcphelper.o: ../serverSocketTCP/tcphelper.cpp ../serverSocketTCP/tcphelper.h \
-		../serverSocketTCP/clientmanager.h
+		../serverSocketTCP/clientmanager.h \
+		../serverSocketTCP/msgqueue.h \
+		../serverSocketTCP/iosocket.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o tcphelper.o ../serverSocketTCP/tcphelper.cpp
+
+msgqueue.o: ../serverSocketTCP/msgqueue.cpp ../serverSocketTCP/msgqueue.h
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o msgqueue.o ../serverSocketTCP/msgqueue.cpp
 
 ####### Install
 

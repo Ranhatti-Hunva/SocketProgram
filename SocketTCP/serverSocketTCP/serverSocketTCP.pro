@@ -18,8 +18,8 @@ SOURCES += \
         main.cpp \
     clientmanager.cpp \
     iosocket.cpp \
-    usercommand.cpp \
-    tcphelper.cpp
+    tcphelper.cpp \
+    msgqueue.cpp
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
@@ -31,5 +31,5 @@ DISTFILES +=
 HEADERS += \
     clientmanager.h \
     iosocket.h \
-    usercommand.h \
-    tcphelper.h
+    tcphelper.h \
+    msgqueue.h
