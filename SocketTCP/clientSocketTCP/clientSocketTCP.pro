@@ -16,9 +16,9 @@ DEFINES += QT_DEPRECATED_WARNINGS
 
 SOURCES += \
         main.cpp \
-    usercommand.cpp \
     iosocket.cpp \
-    tcphelper.cpp
+    tcphelper.cpp \
+    msgqueue.cpp
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
@@ -26,6 +26,6 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
 
 HEADERS += \
-    usercommand.h \
     iosocket.h \
-    tcphelper.h
+    tcphelper.h \
+    msgqueue.h

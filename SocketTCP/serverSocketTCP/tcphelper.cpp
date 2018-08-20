@@ -181,7 +181,6 @@ int TCPserver::server_echo(int port_num)
 
     // Prepare data for select() later.
     FD_SET(server_fd,&(this->master));
-//    client_fds.push_back(server_fd);
     this->fd_max = server_fd;
 
     // Set non-blocking to server.
@@ -272,10 +271,6 @@ int TCPserver::reciver(int server_fd, client_list& client_socket_list, msg_queue
                     };
 
                     this->closer(client_fds[i], client_socket_list);
-//                    FD_CLR(client_fds[i], &master);
-//                    client_socket_list.delete_fs_num(client_fds[i]);
-//                    close(client_fds[i]);
-//                    client_fds.erase(client_fds.begin()+static_cast<long>(i));
                 };
             }
             else
@@ -287,20 +282,26 @@ int TCPserver::reciver(int server_fd, client_list& client_socket_list, msg_queue
                 if (is_msg_usable)
                 {
                     std::cout << "Message from client, socket " << client_fds[i] << ":" << host_msg.msg_incompleted <<std::endl;
-                    process_on_buffer_recv(host_msg.msg_incompleted.c_str(), client_socket_list, client_fds[i], msg_wts);
+                    if (host_msg.msg_incompleted.compare("MSG OK"))
+                    {
+                        msg_wts.push("MSG OK/"+std::to_string(client_fds[i]));
+                        process_on_buffer_recv(host_msg.msg_incompleted.c_str(), client_socket_list, client_fds[i], msg_wts);
+                    };
                 };
             };
         };
     };
     return 0;
-}
+};
 
-void TCPserver::closer(int server_fd, client_list& client_socket_list){
+void TCPserver::closer(int server_fd, client_list& client_socket_list)
+{
 
     std::unique_lock<std::mutex> locker(fd_set_mutex);
     FD_CLR(server_fd, &master);
     close(server_fd);
-    for (unsigned long i=0; i < this->client_fds.size(); i++){
+    for (unsigned long i=0; i < this->client_fds.size(); i++)
+    {
         if (client_fds[i] == server_fd)
         {
             client_fds.erase(client_fds.begin()+static_cast<long>(i));

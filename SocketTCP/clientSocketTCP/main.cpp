@@ -15,7 +15,7 @@
 #include <vector>
 #include <fcntl.h>
 
-#include "usercommand.h"
+#include "msgqueue.h"
 #include "iosocket.h"
 #include "tcphelper.h"
 
@@ -84,23 +84,29 @@ int main()
         // Connection success and start to communication.
         printf("\n=> Enter # to end the connection \n\n");
 
-        user_command user_command;   // object to project race-conditon on user input from terminal.
-        user_command.clear();        // search properties on usercomnand.h
+        msg_queue msg_wts;   // object to project race-conditon on user input from terminal.
+        msg_wts.clear();        // search properties on usercomnand.h
+
+        bool end_connection = false;
 
         // Star a new thread for sending message
-        scoped_thread sendThread(std::thread(send_TCP,std::ref(user_command), std::ref(client_helper), std::ref(client_fd)));
+        scoped_thread sendThread(thread(send_TCP,ref(msg_wts), ref(client_helper), ref(client_fd),ref(end_connection)));
 
         // Disconnect if user input is '#'.
-        while(!user_command.compare("#"))
+        while(!end_connection)
         {
             int is_msg_usable = client_helper.recv_msg(client_fd);
             if (is_msg_usable == -1)
             {
-                user_command.set("#");
+                end_connection = true;
             }
             else if (is_msg_usable == 1)
             {
                 cout << "Messaga from server :" << client_helper.msg_incomplete << endl;
+                // Repondre to server when get msg.
+                if (client_helper.msg_incomplete.compare("MSG OK")){
+                    msg_wts.push("MSG OK");
+                };
             };
         };
         is_finsh = is_reconnect(client_fd);

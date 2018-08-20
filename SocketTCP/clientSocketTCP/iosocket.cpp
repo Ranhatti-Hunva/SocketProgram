@@ -2,63 +2,61 @@
 #include "tcphelper.h"
 
 //void send_TCP(user_command& user_command, fd_set& master, int& socket_fd)
-void send_TCP(user_command& user_command, TCPclient& client_helper, int& socket_fd)
+void send_TCP(msg_queue& msg_wts, TCPclient& client_helper, int& socket_fd, bool& end_connection)
 {
     std::string user_cmd_str;
     user_cmd_str.clear();
 
     bool is_login = true;
-    while(1)
-    {        
+    while(!end_connection)
+    {
         if (is_login)
         {
             // If just login, send a msg as format */+user_name
-            user_cmd_str = "*/"+user_name;
+            msg_wts.push("*/"+user_name);
             is_login = false;
         }
         else
         {
-            if(user_command.compare("#"))
+            // Get unbocking user input from terminal.
+            fd_set reader;
+            FD_SET(0,&reader);
+
+            struct timeval general_tv;
+            general_tv.tv_sec = 0;
+            general_tv.tv_usec = 5000;
+
+            select(1,&reader, nullptr, nullptr, &general_tv);
+            if (FD_ISSET(0, &reader))
             {
-                // Exit thread.
-                break;
+                getline(std::cin, user_cmd_str);
+                msg_wts.push(user_cmd_str);
             }
             else
             {
-                // Get unbocking user input from terminal.
-                fd_set reader;
-                FD_SET(0,&reader);
-
-                struct timeval general_tv;
-                general_tv.tv_sec = 0;
-                general_tv.tv_usec = 5000;
-
-                select(1,&reader, nullptr, nullptr, &general_tv);
-                if (FD_ISSET(0, &reader))
-                {
-                    getline(std::cin, user_cmd_str);
-                    user_command.set(user_cmd_str);
-                }
-                else
-                {
-                    user_cmd_str.clear();
-                };
+                user_cmd_str.clear();
             };
         };
 
-        if (!user_cmd_str.empty())
+        if (!msg_wts.empty())
         {
-            if(user_cmd_str.compare("#"))
+            if(msg_wts.get().compare("#"))
             {
                 // Send msg.
-                if(!client_helper.send_msg(socket_fd,user_cmd_str)){
+                if(!client_helper.send_msg(socket_fd,msg_wts.get()))
+                {
                     printf("=> Sending failure !!!");
-//                    client_helper.pinger(socket_fd);
+                    // client_helper.pinger(socket_fd);
+                }
+                else
+                {
+                    msg_wts.pop();
                 };
             }
             else
             {
                 // Exit thread.
+                end_connection = true;
                 break;
             };
         }

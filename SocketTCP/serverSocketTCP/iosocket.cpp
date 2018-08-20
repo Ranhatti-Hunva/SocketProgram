@@ -75,18 +75,10 @@ void send_TCP(msg_queue& msg_wts, client_list& client_socket_list, TCPserver& se
                         }
                         else
                         {
-//                            std::unique_lock<std::mutex> locker_fd_set(fd_set_muxtex,std::defer_lock);
                             // Force close connection with client by server.
                             if (!container[0].compare("#"))
                             {
                                 server_helper.closer(socket_for_client,client_socket_list);
-
-//                                locker_fd_set.lock();
-//                                FD_CLR(socket_for_client, &master);
-//                                client_socket_list.delete_fs_num(socket_for_client);    // delete client information.
-//                                close(socket_for_client);
-//                                input_fds.erase(std::remove(input_fds.begin(), input_fds.end(), socket_for_client), input_fds.end());
-//                                locker_fd_set.unlock();
 
                                 printf("=> Closed connection with soket %d.\n",socket_for_client);
                             }
@@ -94,54 +86,6 @@ void send_TCP(msg_queue& msg_wts, client_list& client_socket_list, TCPserver& se
                             {
                                 // Return ??
                                 server_helper.send_msg(socket_for_client, container[0]);
-//                                server_helper.packed_msg(container[0]);
-
-//                                memset(&buffer,0,bufsize/sizeof(char));
-//                                strcpy(buffer, container[0].c_str());
-//                                total_bytes = container[0].length();
-
-//                                byte_left = total_bytes;
-//                                sended_bytes = 0;
-//                                int try_times = 0;
-
-//                                locker_fd_set.lock();
-//                                while(sended_bytes < total_bytes)
-//                                {
-//                                    send_fds = master;
-//                                    if (select(fdmax+1,nullptr, &send_fds, nullptr, &tv) <0)
-//                                    {
-//                                        perror("=>Select ");
-//                                        exit(EXIT_FAILURE);
-//                                    };
-
-//                                    if(FD_ISSET(socket_for_client, &send_fds))
-//                                    {
-//                                        status = send(socket_for_client, buffer+sended_bytes, byte_left, 0);        // Worng querry
-//                                        if (status == -1UL)
-//                                        {
-//                                            printf("=>Sending failure !!!");
-//                                            if (try_times ++ < 3)
-//                                            {
-//                                                break;
-//                                            };
-//                                        }
-//                                        else
-//                                        {
-//                                            sended_bytes += status;
-//                                            byte_left -= status;
-//                                        };
-//                                    }
-//                                    else
-//                                    {
-//                                        printf("=> Socket is not ready to send data!! \n");
-//                                        if (try_times ++ < 3)
-//                                        {
-//                                            printf("=> Error on sending message");
-//                                            break;
-//                                        };
-//                                    };
-//                                };
-//                                locker_fd_set.unlock();
                             };
                         };
                     };

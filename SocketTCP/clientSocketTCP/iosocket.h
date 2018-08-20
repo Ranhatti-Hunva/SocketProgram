@@ -18,12 +18,12 @@
 #include <vector>
 #include <fcntl.h>
 
-#include "usercommand.h"
+#include "msgqueue.h"
 #include "tcphelper.h"
 
 extern std::string user_name;
 
-void send_TCP(user_command& user_command, TCPclient& client_helper, int& socket_fd);
+void send_TCP(msg_queue& msg_wts, TCPclient& client_helper, int& socket_fd, bool& finish);
 
 int is_reconnect(int& client_fd);
 
