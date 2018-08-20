@@ -17,11 +17,12 @@
 
 #include "usercommand.h"
 #include "iosocket.h"
-#include "TCPhelper.h"
+#include "tcphelper.h"
 
 using namespace std;
 string user_name;
 
+// RAII for mutil thread.
 class scoped_thread
 {
     std::thread t;
@@ -45,10 +46,10 @@ int main()
 {
     /* Notice the program information */
     printf("\n-------------**--------------\n\n");
-    TCPclient client_helper;
+    TCPclient client_helper; // Help client for any TCP process needed.
 
     /*------------------------------------------------------------------------------------------------------------*/
-    // Searching server information.
+    // Searching server information. Change "" to specific host name if use remote server.
     struct addrinfo *server_infor, *p;
     server_infor = client_helper.get_addinfo_list("",1500);
     p = server_infor;
@@ -63,7 +64,7 @@ int main()
         getline(cin, user_name);
         if(user_name.empty())
         {
-            printf("=> Sorry!! Login fail....");
+            printf("=> Sorry!! Login fail.... \n");
             exit(EXIT_FAILURE);
         };
 
@@ -71,6 +72,7 @@ int main()
         int client_fd;
         while((client_fd=client_helper.connect_with_timeout(p))<0)
         {
+            // Error connect to server or connect timeout.
             int flage_reconnect = is_reconnect(client_fd);
             if (flage_reconnect < 0)
             {
@@ -82,73 +84,24 @@ int main()
         // Connection success and start to communication.
         printf("\n=> Enter # to end the connection \n\n");
 
-        long status;
-
         user_command user_command;   // object to project race-conditon on user input from terminal.
         user_command.clear();        // search properties on usercomnand.h
 
-        fd_set read_fds;
-        FD_ZERO(&read_fds);
+        // Star a new thread for sending message
+        scoped_thread sendThread(std::thread(send_TCP,std::ref(user_command), std::ref(client_helper), std::ref(client_fd)));
 
-        fd_set master;
-        FD_ZERO(&master);
-        FD_SET(client_fd, &master);
-
-        scoped_thread sendThread(std::thread(send_TCP,std::ref(user_command), std::ref(master), std::ref(client_fd)));
-        const unsigned int recv_bufsize = 256;
-        char recv_buffer[recv_bufsize];
-
+        // Disconnect if user input is '#'.
         while(!user_command.compare("#"))
         {
-            struct timeval recv_tv;
-            recv_tv.tv_sec = 0;
-            recv_tv.tv_usec = 5000;
-
-            read_fds = master;
-            if (select(client_fd+1,&read_fds, nullptr, nullptr, &recv_tv) <0)
+            int is_msg_usable = client_helper.recv_msg(client_fd);
+            if (is_msg_usable == -1)
             {
-                perror("=> Select");
-                exit(EXIT_FAILURE);
+                user_command.set("#");
             }
-
-            if (FD_ISSET(client_fd, &read_fds))
+            else if (is_msg_usable == 1)
             {
-                memset(&recv_buffer,0,recv_bufsize);
-                if ((status=recv(client_fd,recv_buffer,recv_bufsize,0)) <=0 )
-                {
-                    if ((status == -1) && ((errno == EAGAIN)|| (errno == EWOULDBLOCK)))
-                    {
-                        perror("=> Message is not gotten complete !!");
-                    }
-                    else
-                    {
-                        if (status == 0)
-                        {
-                            printf("=> Connection has been close\n");
-                        }
-                        else
-                        {
-                            printf("=> Error socket.");
-                        };
-                        user_command.set("#");
-                        break;
-                    };
-                }
-                else
-                {
-                    cout << "Messaga from server :" << recv_buffer << endl;
-                };
+                cout << "Messaga from server :" << client_helper.msg_incomplete << endl;
             };
-
-//            int is_msg_recived = client_helper.recv_msg(client_fd);
-//            if (is_msg_recived == -1)
-//            {
-//                user_command.set("#");
-//            }
-//            else if (is_msg_recived == 1)
-//            {
-//                cout << "Messaga from server :" << client_helper.msg_incomplete << endl;
-//            };
         };
         is_finsh = is_reconnect(client_fd);
     };

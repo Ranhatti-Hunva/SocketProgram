@@ -1,21 +1,18 @@
 #include "iosocket.h"
+#include "tcphelper.h"
 
-void send_TCP(user_command& user_command, fd_set& master, int& socket_fd)
+//void send_TCP(user_command& user_command, fd_set& master, int& socket_fd)
+void send_TCP(user_command& user_command, TCPclient& client_helper, int& socket_fd)
 {
-    fd_set send_fds;
-    FD_ZERO(&send_fds);
-
-    struct timeval general_tv;
-    general_tv.tv_sec = 0;
-    general_tv.tv_usec = 5000;
-
     std::string user_cmd_str;
-    bool is_login = true;
+    user_cmd_str.clear();
 
+    bool is_login = true;
     while(1)
-    {
+    {        
         if (is_login)
         {
+            // If just login, send a msg as format */+user_name
             user_cmd_str = "*/"+user_name;
             is_login = false;
         }
@@ -23,12 +20,19 @@ void send_TCP(user_command& user_command, fd_set& master, int& socket_fd)
         {
             if(user_command.compare("#"))
             {
+                // Exit thread.
                 break;
             }
             else
             {
+                // Get unbocking user input from terminal.
                 fd_set reader;
                 FD_SET(0,&reader);
+
+                struct timeval general_tv;
+                general_tv.tv_sec = 0;
+                general_tv.tv_usec = 5000;
+
                 select(1,&reader, nullptr, nullptr, &general_tv);
                 if (FD_ISSET(0, &reader))
                 {
@@ -46,57 +50,15 @@ void send_TCP(user_command& user_command, fd_set& master, int& socket_fd)
         {
             if(user_cmd_str.compare("#"))
             {
-                const unsigned int send_bufsize = 256;
-                char send_buffer[send_bufsize];
-                memset(&send_buffer,0,send_bufsize/sizeof(char));
-
-                strcpy(send_buffer, user_cmd_str.c_str());
-
-                unsigned long total_bytes, byte_left, sended_bytes;
-                total_bytes = user_cmd_str.length();
-                byte_left = total_bytes;
-                sended_bytes = 0;
-                int try_times = 0;
-
-                while(sended_bytes < total_bytes)
-                {
-                    send_fds = master;
-                    if (select(socket_fd+1,nullptr, &send_fds, nullptr, &general_tv) <0)
-                    {
-                        perror("=>Select ");
-                        exit(EXIT_FAILURE);
-                    };
-
-                    if(FD_ISSET(socket_fd, &send_fds))
-                    {
-                        long status = send(socket_fd, send_buffer+sended_bytes, byte_left, 0);
-                        if (status < 0)
-                        {
-                            printf("=> Sending failure !!!");
-                            if (try_times++ < 3)
-                            {
-                                break;
-                            };
-                        }
-                        else
-                        {
-                            sended_bytes += static_cast<unsigned long>(status);
-                            byte_left -= static_cast<unsigned long>(status);
-                        };
-                    }
-                    else
-                    {
-                        printf("=> Socket is not ready to send data!! \n");
-                        if (try_times++ < 3)
-                        {
-                            printf("=> Error on sending message");
-                            break;
-                        };
-                    };
+                // Send msg.
+                if(!client_helper.send_msg(socket_fd,user_cmd_str)){
+                    printf("=> Sending failure !!!");
+//                    client_helper.pinger(socket_fd);
                 };
             }
             else
             {
+                // Exit thread.
                 break;
             };
         }
@@ -134,34 +96,6 @@ int is_reconnect(int& client_fd)
     };
 };
 
-
-bool unpacked_msg(char* buffer, std::string& msg_incomplete)
-{
-    char* p = buffer;
-    while(*p != 0)
-    {
-        switch (*p)
-        {
-            case 2:
-            {
-                msg_incomplete.clear();
-                break;
-            };
-            case 3:
-            {
-                return true;
-            };
-            default:
-            {
-                msg_incomplete.append(p);
-                break;
-            };
-        };
-        p++;
-    };
-
-    return false;
-}
 
 
 

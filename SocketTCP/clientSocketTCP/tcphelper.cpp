@@ -36,6 +36,95 @@ struct addrinfo* TCPhelper::get_addinfo_list(std::string host_name, int port_num
     return infor_list;
 };
 
+bool TCPhelper::unpacked_msg(char* buffer, std::string& msg_incomplete){
+    char* p = buffer;
+    while(*p != 0)
+    {
+        switch (*p)
+        {
+            case 2:
+            {
+                msg_incomplete.clear();
+                break;
+            };
+            case 3:
+            {
+                return true;
+            };
+            default:
+            {
+                msg_incomplete = msg_incomplete + *p;
+                break;
+            };
+        };
+        p++;
+    };
+    return false;
+}
+
+void TCPhelper::packed_msg(std::string& msg){
+    char begin_c = 2;
+    char end_c = 3;
+    msg = begin_c +msg + end_c;
+}
+
+bool TCPhelper::send_msg(int fd, std::string msg){
+
+    this->packed_msg(msg);
+
+    char send_buffer[bufsize];
+    memset(&send_buffer, 0, bufsize);
+
+    strcpy(send_buffer, msg.c_str());
+
+    fd_set send_fds;
+    FD_ZERO(&send_fds);
+
+    unsigned long total_bytes, byte_left, sended_bytes;
+    total_bytes = msg.length();
+    byte_left = total_bytes;
+    sended_bytes = 0;
+    int try_times = 0;
+
+    while(sended_bytes < total_bytes)
+    {
+        send_fds = master;
+        if (select(fd+1,nullptr, &send_fds, nullptr, &general_tv) <0)
+        {
+            perror("=>Select ");
+            exit(EXIT_FAILURE);
+        };
+
+        if(FD_ISSET(fd, &send_fds))
+        {
+            long status = send(fd, send_buffer+sended_bytes, byte_left, 0);
+            if (status < 0)
+            {
+                printf("=> Sending failure !!!");
+                if (try_times++ < 3)
+                {
+                    return false;
+                };
+            }
+            else
+            {
+                sended_bytes += static_cast<unsigned long>(status);
+                byte_left -= static_cast<unsigned long>(status);
+            };
+        }
+        else
+        {
+            printf("=> Socket is not ready to send data!! \n");
+            if (try_times++ < 3)
+            {
+                printf("=> Error on sending message");
+                return false;
+            };
+        };
+    };
+    return true;
+};
+
 // TCPclient contructor, nmenthod,....
 int TCPclient::connect_with_timeout(struct addrinfo *server_infor){
     // Creat client socket
@@ -90,13 +179,14 @@ int TCPclient::connect_with_timeout(struct addrinfo *server_infor){
             }
             else
             {
-                // Connection timeput after 3s.
+                // Connection timeout.
                 printf("=> Connection timeout \n");
                 return -1;
             };
         }
         else
         {
+            // Undetermined error soket.
             printf("=> Error in connection()\n");
             return -1;
         };
@@ -124,6 +214,7 @@ int TCPclient::recv_msg(int client_fd){
     long num_byte;
     char recv_buf[bufsize];
     memset(&recv_buf,0,bufsize);
+
     if (FD_ISSET(client_fd, &read_fds))
     {
         memset(&recv_buf,0,bufsize);
@@ -149,7 +240,7 @@ int TCPclient::recv_msg(int client_fd){
         }
         else
         {
-            bool is_valid = unpacked_msg(recv_buf, msg_incomplete);
+            bool is_valid = this->unpacked_msg(recv_buf, msg_incomplete);
             return (is_valid)?1:0;
         };
     }
@@ -158,7 +249,6 @@ int TCPclient::recv_msg(int client_fd){
         return 0;
     };
 };
-
 
 // TCPserver contructor, menthod,....
 /*
@@ -233,7 +323,3 @@ int TCPhelper::acceptor(int server_fd, std::vector<int>& input_fds, fd_set& mast
     return socket_for_client;
 };
 */
-
-
-
-

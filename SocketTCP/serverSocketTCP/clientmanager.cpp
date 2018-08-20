@@ -68,8 +68,6 @@ int client_list::get_by_order(unsigned long order,  client_information& contain_
     }
 };
 
-
-
 int client_list::delete_fs_num(int fd_num)
 {
     std::lock_guard<std::mutex> guard(client_mutext);

@@ -19,12 +19,12 @@
 #include <fcntl.h>
 
 #include "usercommand.h"
+#include "tcphelper.h"
+
 extern std::string user_name;
 
-void send_TCP(user_command& user_command, fd_set& master, int& socket_fd);
+void send_TCP(user_command& user_command, TCPclient& client_helper, int& socket_fd);
 
 int is_reconnect(int& client_fd);
-
-bool unpacked_msg(char* buffer, std::string& msg_incomplete);
 
 #endif // IOSOCKET_H

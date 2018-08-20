@@ -25,7 +25,7 @@ std::mutex user_command_muxtex;
 std::mutex fd_set_muxtex;
 std::condition_variable cond;
 
-class  scoped_thread        // Protecting thread. Sure that the threads are finsh for for the process is terminal.
+class  scoped_thread
 {
     std::thread t;
 public:
@@ -47,8 +47,9 @@ public:
 
 int main()
 {
-    TCPhelper TCP_server_helper;
-    int server_fd = TCP_server_helper.server_echo(1500);
+    // Create server echo socket on port 1500
+    TCPserver server_helper;
+    int server_fd = server_helper.server_echo(1500);
 
     /*------------------------------------------------------------------------------------------------------------*/
     // Connect and communiaction with client.
@@ -81,7 +82,7 @@ int main()
     user_command user_command;
     user_command.clear();
 
-    scoped_thread sendThread(std::thread(send_TCP,std::ref(user_command), std::ref(client_socket_list), std::ref(master), std::ref(fdmax), std::ref(client_fds)));
+    scoped_thread sendThread(std::thread(send_TCP,std::ref(user_command), std::ref(client_socket_list), std::ref(master), std::ref(fdmax), std::ref(client_fds), std::ref(server_helper)));
 
     while(!user_command.compare("#"))
     {
@@ -108,7 +109,7 @@ int main()
 
         if (FD_ISSET(server_fd, &read_fds))
         {
-            TCP_server_helper.acceptor(server_fd, client_fds, master, fdmax, client_socket_list);
+            server_helper.acceptor(server_fd, client_fds, master, fdmax, client_socket_list);
         };
 
         for (unsigned long i = 0; i< client_fds.size(); i++)
@@ -150,13 +151,15 @@ int main()
                 }
                 else
                 {
-//                    int is_unpacked = unpacked_msg(buffer, client_socket_list, client_fds[i]);
-//                    if (is_unpacked == 0) {
-//                        cout << "Message from client, socket " << client_fds[i] << ":" << buffer << endl;
-//                        process_on_buffer_recv(buffer,client_socket_list, client_fds[i], user_command);
-//                    };
-                    cout << "Message from client, socket " << client_fds[i] << ":" << buffer << endl;
-                    process_on_buffer_recv(buffer,client_socket_list, client_fds[i], user_command);
+                    std::string msg_incompleted;
+                    int is_unpacked = server_helper.unpacked_msg(buffer, msg_incompleted);
+                    if (is_unpacked) {
+                        cout << "Message from client, socket " << client_fds[i] << ":" << msg_incompleted << endl;
+                        process_on_buffer_recv(msg_incompleted.c_str(),client_socket_list, client_fds[i], user_command);
+                    };
+
+//                    cout << "Message from client, socket " << client_fds[i] << ":" << buffer << endl;
+//                    process_on_buffer_recv(buffer,client_socket_list, client_fds[i], user_command);
                 };
             };
         };

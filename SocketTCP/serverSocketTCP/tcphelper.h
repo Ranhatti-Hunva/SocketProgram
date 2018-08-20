@@ -20,29 +20,37 @@
 
 #include "clientmanager.h"
 
-class TCPhelper
-{
-    struct addrinfor* my_addr;
+class TCPhelper {
+protected:
+    fd_set master;
+    int fd_max;
+
+    struct timeval general_tv;
+
+    static const unsigned int bufsize = 256;
 public:
+    TCPhelper();
     // Get address information from host name.
     struct addrinfo* get_addinfo_list(std::string host_name, int port_num);
 
+    // Packed msg ad format <2(char)><msg><3(char)> (2 is Start of Text, 3 is End of Text in ASCII).
+    void packed_msg(std::string& msg);
+
+    // Unpacked msg.
+    bool unpacked_msg(char* buffer, std::string& msg_incomplete);
+
+    // Send packed message.
+    bool send_msg(int fd, std::string msg);
+};
+
+class TCPserver:public TCPhelper
+{
+public:
     // Make a server socket TCP/IP
     int server_echo(int port_num);
 
     // Acceptor for a new client connection
     int acceptor(int server_fd, std::vector<int>& input_fds, fd_set& master,int& fdmax, client_list& client_socket_list);
-
-    // Creat new socket fd
-    int create_master_server(int doimain, int type, int protocol);
-
-    // Connect to a server with timeout. Let decision to re-connect on user.
-    int connect_with_timeout(int socket_fd, struct addrinfo* des_addr, struct timeval tv);
-
-    // Make a client socket TCP/IP
-    int client(std::string host_name);
-
-
 };
 
 #endif // TCPHELPER_H

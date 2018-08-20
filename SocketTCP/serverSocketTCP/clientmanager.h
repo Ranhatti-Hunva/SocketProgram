@@ -15,7 +15,7 @@ struct  client_information
 {
     char user_name[256];
     int num_socket;
-    std::queue<std::string> msg_queue;
+//    std::queue<std::string> msg_queue;
     std::string msg_incompleted;
 };
 

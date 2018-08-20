@@ -15,7 +15,7 @@ void splits_string(const std::string& subject, std::vector<std::string>& contain
     delete[] s;
 }
 
-void send_TCP(user_command& user_command, client_list& client_socket_list, fd_set& master, int& fdmax, std::vector<int>& input_fds)
+void send_TCP(user_command& user_command, client_list& client_socket_list, fd_set& master, int& fdmax, std::vector<int>& input_fds, TCPserver& server_helper)
 {
     std::vector<std::string> container;
     int socket_for_client;
@@ -90,6 +90,8 @@ void send_TCP(user_command& user_command, client_list& client_socket_list, fd_se
                             }
                             else // Send msg to client.
                             {
+                                server_helper.packed_msg(container[0]);
+
                                 memset(&buffer,0,bufsize/sizeof(char));
                                 strcpy(buffer, container[0].c_str());
                                 total_bytes = container[0].length();
@@ -203,51 +205,3 @@ void process_on_buffer_recv(const char* buffer, client_list& client_socket_list,
         };
     };
 };
-
-int unpacked_msg(char* buffer, client_list& client_socket_list, int soket_fd)
-{
-    struct client_information client_related;
-    if(client_socket_list.get_by_fd(soket_fd, client_related) < 0){
-        printf("=> Can't find client relating with socket");
-        return -1;
-    };
-
-    std::string msg;
-    if((!client_related.msg_incompleted.empty())){
-        msg = client_related.msg_incompleted;
-    };
-
-    char* p = buffer;
-    while(*p != 0)
-    {
-        switch (*p)
-        {
-            case 2:
-            {
-                msg.clear();
-                break;
-            };
-            case 3:
-            {
-                client_related.msg_queue.push(msg);
-                msg.clear();
-                break;
-            };
-            default:
-            {
-                msg.append(p);
-                break;
-            };
-        };
-        p++;
-    };
-    client_related.msg_incompleted = msg;
-
-    return (msg.empty())?0:-1;
-}
-
-//void packet_msg(char* buffer){
-//    const char begin_char = 2;
-//    const char end_char = 3;
-//    buffer = begin_char + buffer + end_char;
-//}

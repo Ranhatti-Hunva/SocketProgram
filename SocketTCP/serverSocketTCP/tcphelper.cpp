@@ -1,5 +1,14 @@
 #include "tcphelper.h"
 
+// TCPhelper contructor, menthod, .....
+TCPhelper::TCPhelper(){
+    FD_ZERO(&master);
+    fd_max = 0;
+
+    general_tv.tv_sec = 1;
+    general_tv.tv_usec = 0;
+}
+
 struct addrinfo* TCPhelper::get_addinfo_list(std::string host_name, int port_num){
     struct addrinfo* infor_list;        // servinfor is linked-list which contain all address information.
     long status;                        // Check error from getaddrinfor().Status return no-zero if there's an error.
@@ -27,9 +36,96 @@ struct addrinfo* TCPhelper::get_addinfo_list(std::string host_name, int port_num
     return infor_list;
 };
 
+bool TCPhelper::unpacked_msg(char* buffer, std::string& msg_incomplete){
+    char* p = buffer;
+    while(*p != 0)
+    {
+        switch (*p)
+        {
+            case 2:
+            {
+                msg_incomplete.clear();
+                break;
+            };
+            case 3:
+            {
+                return true;
+            };
+            default:
+            {
+                msg_incomplete = msg_incomplete + *p;
+                break;
+            };
+        };
+        p++;
+    };
+    return false;
+}
 
-//int TCPhelper::creat_socket_fd(int doimain, int type, int protocol){};
-int TCPhelper::server_echo(int port_num){
+void TCPhelper::packed_msg(std::string& msg){
+    char begin_c = 2;
+    char end_c = 3;
+    msg = begin_c+msg+end_c;
+}
+
+bool TCPhelper::send_msg(int fd, std::string msg){
+//    this->packed_msg(msg);
+
+    char send_buffer[bufsize];
+    memset(&send_buffer, 0, bufsize);
+
+    strcpy(send_buffer, msg.c_str());
+
+    fd_set send_fds;
+    FD_ZERO(&send_fds);
+
+    unsigned long total_bytes, byte_left, sended_bytes;
+    total_bytes = msg.length();
+    byte_left = total_bytes;
+    sended_bytes = 0;
+    int try_times = 0;
+
+    while(sended_bytes < total_bytes)
+    {
+        send_fds = master;
+        if (select(fd+1,nullptr, &send_fds, nullptr, &general_tv) <0)
+        {
+            perror("=>Select ");
+            exit(EXIT_FAILURE);
+        };
+
+        if(FD_ISSET(fd, &send_fds))
+        {
+            long status = send(fd, send_buffer+sended_bytes, byte_left, 0);
+            if (status < 0)
+            {
+                printf("=> Sending failure !!!");
+                if (try_times++ < 3)
+                {
+                    return false;
+                };
+            }
+            else
+            {
+                sended_bytes += static_cast<unsigned long>(status);
+                byte_left -= static_cast<unsigned long>(status);
+            };
+        }
+        else
+        {
+            printf("=> Socket is not ready to send data!! \n");
+            if (try_times++ < 3)
+            {
+                printf("=> Error on sending message");
+                return false;
+            };
+        };
+    };
+    return true;
+};
+
+// TCPserver contructor, menthod, .....
+int TCPserver::server_echo(int port_num){
     int server_fd = -1;
     struct addrinfo *IP_list, *p;
 
@@ -72,7 +168,7 @@ int TCPhelper::server_echo(int port_num){
     return server_fd;
 };
 
-int TCPhelper::acceptor(int server_fd, std::vector<int>& input_fds, fd_set& master,int& fdmax, client_list& client_socket_list){
+int TCPserver::acceptor(int server_fd, std::vector<int>& input_fds, fd_set& master,int& fdmax, client_list& client_socket_list){
     struct sockaddr client_addr;
     unsigned int size_client_address = sizeof(client_addr);
     int socket_for_client;
@@ -98,7 +194,3 @@ int TCPhelper::acceptor(int server_fd, std::vector<int>& input_fds, fd_set& mast
     };
     return socket_for_client;
 };
-
-
-
-
