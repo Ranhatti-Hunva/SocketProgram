@@ -55,19 +55,19 @@ int main()
     p = server_infor;
 
     /*------------------------------------------------------------------------------------------------------------*/
+    // User login.
+    printf("=> Please inser user's names before start program:");
+    getline(cin, user_name);
+    if(user_name.empty())
+    {
+        printf("=> Sorry!! Login fail.... \n");
+        exit(EXIT_FAILURE);
+    };
+
     // Start program.
     bool is_finsh = false;
     while (!is_finsh)
     {
-        // User login.
-        printf("=> Please inser user's names before start program:");
-        getline(cin, user_name);
-        if(user_name.empty())
-        {
-            printf("=> Sorry!! Login fail.... \n");
-            exit(EXIT_FAILURE);
-        };
-
         // Connection with timeout to server.
         int client_fd;
         while((client_fd=client_helper.connect_with_timeout(p))<0)
@@ -84,28 +84,40 @@ int main()
         // Connection success and start to communication.
         printf("\n=> Enter # to end the connection \n\n");
 
-        msg_queue msg_wts;   // object to project race-conditon on user input from terminal.
-        msg_wts.clear();        // search properties on usercomnand.h
+        msg_queue msg_wts;      // queue for the massages are wating to send.
+        msg_wts.clear();
 
         bool end_connection = false;
 
-        // Star a new thread for sending message
+        // Start a new thread for sending message
         scoped_thread sendThread(thread(send_TCP,ref(msg_wts), ref(client_helper), ref(client_fd),ref(end_connection)));
 
-        // Disconnect if user input is '#'.
+        // Listern incomming message
         while(!end_connection)
         {
             int is_msg_usable = client_helper.recv_msg(client_fd);
             if (is_msg_usable == -1)
             {
+                // Socket error or loss conection.
                 end_connection = true;
             }
             else if (is_msg_usable == 1)
             {
-                cout << "Messaga from server :" << client_helper.msg_incomplete << endl;
-                // Repondre to server when get msg.
-                if (client_helper.msg_incomplete.compare("MSG OK")){
-                    msg_wts.push("MSG OK");
+                cout << "Message "<< (int) client_helper.ID_msg_incomplete <<" from server :" << client_helper.msg_incomplete << endl;
+
+                if (client_helper.msg_incomplete.substr(0,3).compare("RSP")){
+                    // Repondre to server when get msg.
+                    string RSP = "RSP";
+                    string respond = RSP + client_helper.ID_msg_incomplete;
+
+                     std::cout << "Recv " << (int) client_helper.ID_msg_incomplete << std::endl;
+
+                    msg_wts.push_respond(respond);
+                }
+                else
+                {
+                    // Delete key message timout.
+                    client_helper.msg_confirm(client_helper.msg_incomplete);
                 };
             };
         };

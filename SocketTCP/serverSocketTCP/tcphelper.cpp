@@ -41,43 +41,48 @@ struct addrinfo* TCPhelper::get_addinfo_list(std::string host_name, int port_num
     return infor_list;
 };
 
-bool TCPhelper::unpacked_msg(char* buffer, std::string& msg_incomplete)
-{
+bool TCPhelper::unpacked_msg(char* buffer, std::string& msg_incomplete, char& ID_msg_incomplete){
     char* p = buffer;
     while(*p != 0)
     {
         switch (*p)
         {
-        case 2:
-        {
-            msg_incomplete.clear();
-            break;
-        };
-        case 3:
-        {
-            return true;
-        };
-        default:
-        {
-            msg_incomplete = msg_incomplete + *p;
-            break;
-        };
+            case 2:
+            {
+                msg_incomplete.clear();
+                p++;
+                ID_msg_incomplete = *p;
+                break;
+            };
+            case 3:
+            {
+                return true;
+            };
+            default:
+            {
+                msg_incomplete = msg_incomplete + *p;
+                break;
+            };
         };
         p++;
     };
     return false;
 }
 
-void TCPhelper::packed_msg(std::string& msg)
-{
+char TCPhelper::packed_msg(std::string& msg){
+    static char ID = 1;
     char begin_c = 2;
     char end_c = 3;
-    msg = begin_c+msg+end_c;
+
+    msg = ID + msg + end_c;
+    msg = begin_c +  msg;
+
+    return ID++;
 }
 
 bool TCPhelper::send_msg(int fd, std::string msg)
 {
-    this->packed_msg(msg);
+    char ID_message = this->packed_msg(msg);
 
     char send_buffer[bufsize];
     memset(&send_buffer, 0, bufsize);
@@ -132,6 +137,8 @@ bool TCPhelper::send_msg(int fd, std::string msg)
             };
         };
     };
+
+     std::cout << "Send " << (int) ID_message << std::endl;
     return true;
 };
 
@@ -278,14 +285,23 @@ int TCPserver::reciver(int server_fd, client_list& client_socket_list, msg_queue
                 client_information host_msg;
                 client_socket_list.get_by_fd(client_fds[i],host_msg);
 
-                int is_msg_usable = this->unpacked_msg(recv_buffer, host_msg.msg_incompleted);
+                bool is_msg_usable = this->unpacked_msg(recv_buffer, host_msg.msg_incompleted, host_msg.ID_msg_incompleted);
                 if (is_msg_usable)
                 {
-                    std::cout << "Message from client, socket " << client_fds[i] << ":" << host_msg.msg_incompleted <<std::endl;
-                    if (host_msg.msg_incompleted.compare("MSG OK"))
+                    std::cout << "Message "<<(int) host_msg.ID_msg_incompleted <<" from client on socket " << client_fds[i] << ":" << host_msg.msg_incompleted <<std::endl;
+                    if (host_msg.msg_incompleted.substr(0,3).compare("RSP"))
                     {
-                        msg_wts.push("MSG OK/"+std::to_string(client_fds[i]));
+                        std::string RSP = "RSP";
+                        std::string msg = RSP + host_msg.ID_msg_incompleted + "/";
+
+                         std::cout << "Recv " << (int) host_msg.ID_msg_incompleted << std::endl;
+
+                        msg_wts.push_respond(msg+std::to_string(client_fds[i]));
                         process_on_buffer_recv(host_msg.msg_incompleted.c_str(), client_socket_list, client_fds[i], msg_wts);
+                    }
+                    else
+                    {
+                        // Deleted respond elelemt.
                     };
                 };
             };
@@ -296,7 +312,6 @@ int TCPserver::reciver(int server_fd, client_list& client_socket_list, msg_queue
 
 void TCPserver::closer(int server_fd, client_list& client_socket_list)
 {
-
     std::unique_lock<std::mutex> locker(fd_set_mutex);
     FD_CLR(server_fd, &master);
     close(server_fd);

@@ -13,7 +13,7 @@ void send_TCP(msg_queue& msg_wts, TCPclient& client_helper, int& socket_fd, bool
         if (is_login)
         {
             // If just login, send a msg as format */+user_name
-            msg_wts.push("*/"+user_name);
+            msg_wts.push_msg("*/"+user_name);
             is_login = false;
         }
         else
@@ -30,27 +30,39 @@ void send_TCP(msg_queue& msg_wts, TCPclient& client_helper, int& socket_fd, bool
             if (FD_ISSET(0, &reader))
             {
                 getline(std::cin, user_cmd_str);
-                msg_wts.push(user_cmd_str);
-            }
-            else
-            {
-                user_cmd_str.clear();
+                if(!user_cmd_str.empty()){
+                    msg_wts.push_msg(user_cmd_str);
+                };
             };
         };
 
-        if (!msg_wts.empty())
+        std::string msg;
+        bool is_respond = false;
+        msg.clear();
+
+        if (!msg_wts.respond_empty()){
+            is_respond = true;
+            msg = msg_wts.respond_get();
+        }
+        else if (!msg_wts.msg_empty())
         {
-            if(msg_wts.get().compare("#"))
+            is_respond = false;
+            msg = msg_wts.msg_get();
+        };
+
+        if (!msg.empty())
+        {
+            if(msg.compare("#"))
             {
                 // Send msg.
-                if(!client_helper.send_msg(socket_fd,msg_wts.get()))
+                if(!client_helper.send_msg(socket_fd,msg, client_helper.rps_queue_timeout, is_respond))
                 {
                     printf("=> Sending failure !!!");
                     // client_helper.pinger(socket_fd);
                 }
                 else
                 {
-                    msg_wts.pop();
+                    (is_respond)?msg_wts.pop_respond():msg_wts.pop_msg();
                 };
             }
             else

@@ -17,6 +17,7 @@ struct  client_information
     int num_socket;
 //    std::queue<std::string> msg_queue;
     std::string msg_incompleted;
+    char ID_msg_incompleted;
 };
 
 class client_list{

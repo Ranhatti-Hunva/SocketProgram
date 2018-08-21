@@ -36,10 +36,10 @@ public:
     struct addrinfo* get_addinfo_list(std::string host_name, int port_num);
 
     // Packed msg ad format <2(char)><msg><3(char)> (2 is Start of Text, 3 is End of Text in ASCII).
-    void packed_msg(std::string& msg);
+    char packed_msg(std::string& msg);
 
     // Unpacked msg.
-    bool unpacked_msg(char* buffer, std::string& msg_incomplete);
+    bool unpacked_msg(char* buffer, std::string& msg_incomplete, char& ID_msg_incomplete);
 
     // Send packed message.
     bool send_msg(int fd, std::string msg);

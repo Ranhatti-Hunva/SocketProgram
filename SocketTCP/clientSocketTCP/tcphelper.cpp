@@ -36,7 +36,7 @@ struct addrinfo* TCPhelper::get_addinfo_list(std::string host_name, int port_num
     return infor_list;
 };
 
-bool TCPhelper::unpacked_msg(char* buffer, std::string& msg_incomplete){
+bool TCPhelper::unpacked_msg(char* buffer, std::string& msg_incomplete, char& ID_msg_incomplete){
     char* p = buffer;
     while(*p != 0)
     {
@@ -45,6 +45,8 @@ bool TCPhelper::unpacked_msg(char* buffer, std::string& msg_incomplete){
             case 2:
             {
                 msg_incomplete.clear();
+                p++;
+                ID_msg_incomplete = *p;
                 break;
             };
             case 3:
@@ -62,23 +64,28 @@ bool TCPhelper::unpacked_msg(char* buffer, std::string& msg_incomplete){
     return false;
 }
 
-void TCPhelper::packed_msg(std::string& msg){
+char TCPhelper::packed_msg(std::string& msg){
+    static char ID = 1;
     char begin_c = 2;
     char end_c = 3;
-    msg = begin_c +msg + end_c;
+
+    msg = ID + msg + end_c;
+    msg = begin_c + msg;
+
+    return ID++;
 }
 
-bool TCPhelper::send_msg(int fd, std::string msg){
-
-    this->packed_msg(msg);
+bool TCPhelper::send_msg(int fd, std::string msg, std::vector<rps_timeout>& rps_queue_timeout, bool& is_rps)
+{
+    char ID_message = this->packed_msg(msg);
 
     char send_buffer[bufsize];
     memset(&send_buffer, 0, bufsize);
 
+    // What happend if msg is longer than bufsize??
     strcpy(send_buffer, msg.c_str());
 
     fd_set send_fds;
-    FD_ZERO(&send_fds);
 
     unsigned long total_bytes, byte_left, sended_bytes;
     total_bytes = msg.length();
@@ -88,7 +95,8 @@ bool TCPhelper::send_msg(int fd, std::string msg){
 
     while(sended_bytes < total_bytes)
     {
-        send_fds = master;
+        FD_ZERO(&send_fds);
+        FD_SET(fd,&send_fds);
         if (select(fd+1,nullptr, &send_fds, nullptr, &general_tv) <0)
         {
             perror("=>Select ");
@@ -122,6 +130,17 @@ bool TCPhelper::send_msg(int fd, std::string msg){
             };
         };
     };
+
+
+    // Return ID to queue.
+    if (!is_rps){
+        rps_timeout timepoint;
+        timepoint.ID = ID_message;
+        timepoint.timeout = std::chrono::system_clock::now();
+        rps_queue_timeout.push_back(timepoint);
+    };
+
+    std::cout << "Send "<< (int) ID_message << std::endl;
     return true;
 };
 
@@ -240,8 +259,8 @@ int TCPclient::recv_msg(int client_fd){
         }
         else
         {
-            bool is_valid = this->unpacked_msg(recv_buf, msg_incomplete);
-            return (is_valid)?1:0;
+            bool is_msg_usable = this->unpacked_msg(recv_buf, msg_incomplete, ID_msg_incomplete);
+            return (is_msg_usable)?1:0;
         };
     }
     else
@@ -250,76 +269,18 @@ int TCPclient::recv_msg(int client_fd){
     };
 };
 
-// TCPserver contructor, menthod,....
-/*
-int TCPhelper::server_echo(int port_num){
-    int server_fd = -1;
-    struct addrinfo *IP_list, *p;
-
-    IP_list = this->get_addinfo_list("",port_num);
-    for(p = IP_list; p != nullptr; p = p->ai_next){
-        if ((server_fd = socket(p->ai_family, p->ai_socktype,p->ai_protocol)) == -1) {
-            continue;
-        }
-
-        if (::bind(server_fd, p->ai_addr, p->ai_addrlen) == -1) {
-            close(server_fd);
-            server_fd = -1;
-            continue;
+void TCPclient::msg_confirm(const std::string rps)
+{
+    const char ID_msg = rps[3];
+    unsigned long i;
+    for (i=0; i < this->rps_queue_timeout.size(); i++)
+    {
+        if(rps_queue_timeout[i].ID == ID_msg)
+        {
+            std::chrono::duration<float> duration = std::chrono::system_clock::now() - rps_queue_timeout[i].timeout;
+            std::cout << duration.count() << std::endl;
+            rps_queue_timeout.erase(rps_queue_timeout.begin()+static_cast<long>(i));
+            break;
         };
-        break;
     };
-
-    if (p == nullptr)  {
-        fprintf(stderr, "=> Server: failed to bind\n");
-        exit(EXIT_FAILURE);
-    };
-
-    // Show the IP infor to terminal
-    struct sockaddr_in *addr_used = reinterpret_cast<struct sockaddr_in *>(p->ai_addr);
-    void *addr_infor = &(addr_used -> sin_addr);
-    char ipstr[INET_ADDRSTRLEN];
-    inet_ntop(p->ai_family, addr_infor, ipstr, sizeof(ipstr));
-
-    printf("=> Create server socket succesfully.\n");
-    printf("=> Server's using the IPv4: %s - %d. \n", ipstr, port_num);
-
-    if (listen(server_fd, 10) == -1) {
-        perror("=> Listen");
-        exit(EXIT_FAILURE);
-    };
-    printf("=> Server's listening!! \n");
-    printf("=> Enter # to close server socket \n\n");
-    freeaddrinfo(IP_list);
-
-    return server_fd;
-};
-*/
-/*
-int TCPhelper::acceptor(int server_fd, std::vector<int>& input_fds, fd_set& master,int& fdmax, client_list& client_socket_list){
-    struct sockaddr client_addr;
-    unsigned int size_client_address = sizeof(client_addr);
-    int socket_for_client;
-
-    if((socket_for_client = accept(server_fd, &client_addr, &size_client_address))<0)
-    {
-        perror("=> Accept error");
-        return -1;
-    }
-    else
-    {
-        FD_SET(socket_for_client, &master);
-        input_fds.push_back(socket_for_client);
-        client_socket_list.add_fd(socket_for_client);
-
-        fdmax = (socket_for_client > fdmax)?socket_for_client:fdmax;
-
-        fcntl(socket_for_client, F_SETFL, O_NONBLOCK); // Put new socket into non-locking state
-
-        char IPclient[INET6_ADDRSTRLEN];
-        inet_ntop(client_addr.sa_family,&(reinterpret_cast<struct sockaddr_in* >(&client_addr)->sin_addr),IPclient, INET6_ADDRSTRLEN);
-        printf("=> New conection from %s on socket %d\n",IPclient,socket_for_client);
-    };
-    return socket_for_client;
-};
-*/
+}

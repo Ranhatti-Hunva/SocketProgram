@@ -36,21 +36,36 @@ void send_TCP(msg_queue& msg_wts, client_list& client_socket_list, TCPserver& se
         {
             std::string user_cmd_str;
             getline(std::cin, user_cmd_str);
-            msg_wts.push(user_cmd_str);
+            if(!user_cmd_str.empty()){
+                msg_wts.push_msg(user_cmd_str);
+            };
         };
 
+        //
+        std::string msg;
+        msg.clear();
+        bool is_respond = false;
+
+        if (!msg_wts.respond_empty()){
+            is_respond = true;
+            msg = msg_wts.respond_get();
+        } else if(!msg_wts.msg_empty()) {
+            is_respond = false;
+            msg = msg_wts.msg_get();
+        }
+
         // Send message
-        if (!msg_wts.empty())
+        if (!msg.empty())
         {            
             // Server close echo-socket.
-            if (!msg_wts.get().compare("#"))
+            if (!msg.compare("#"))
             {
                 finish = true;
                 break;
             }
             else
             {
-                splits_string(msg_wts.get(), container);
+                splits_string(msg, container);
                 // Does msg have 2 part?
                 if(container.size() == 2)
                 {
@@ -95,7 +110,7 @@ void send_TCP(msg_queue& msg_wts, client_list& client_socket_list, TCPserver& se
                     printf("=> Wrong format message or no massge to send !! \n");
                 };
             };
-            msg_wts.pop();
+            (is_respond)?msg_wts.pop_respond():msg_wts.pop_msg();
         }
         else
         {
@@ -141,10 +156,7 @@ void process_on_buffer_recv(const char* buffer, client_list& client_socket_list,
                 }
 
                 // Notify send_TCP wake up to send data.
-//                std::unique_lock<std::mutex> locker(user_command_muxtex);
-                msg_wts.push(message);
-//                locker.unlock();
-//                cond.notify_all();
+                msg_wts.push_msg(message);
             };
         }
         else

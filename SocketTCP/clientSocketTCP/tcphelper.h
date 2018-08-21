@@ -17,9 +17,8 @@
 #include <mutex>
 #include <vector>
 #include <fcntl.h>
-
-//#include "clientmanager.h"
-//#include "iosocket.h"
+#include <chrono>
+#include <queue>
 
 class TCPhelper
 {    
@@ -30,24 +29,34 @@ protected:
     struct timeval general_tv;
 
     static const unsigned int bufsize = 256;
+
+    struct rps_timeout{
+        char ID;
+        std::chrono::system_clock::time_point timeout;
+        int socket;
+    };
+
 public:
     TCPhelper();
     // Get address information from host name.
     struct addrinfo* get_addinfo_list(std::string host_name, int port_num);
 
     // Packed msg ad format <2(char)><msg><3(char)> (2 is Start of Text, 3 is End of Text in ASCII).
-    void packed_msg(std::string& msg);
+    char packed_msg(std::string& msg);
 
     // Unpacked msg.
-    bool unpacked_msg(char* buffer, std::string& msg_incomplete);
+    bool unpacked_msg(char* buffer, std::string& msg_incomplete, char& ID_msg_incomplete);
 
     // Send packed message.
-    bool send_msg(int fd, std::string msg);
+    bool send_msg(int fd, std::string msg, std::vector<rps_timeout>& rps_queue_timeout, bool& is_rps);
 };
 
 class TCPclient: public TCPhelper{
 public:
     std::string msg_incomplete;
+    char ID_msg_incomplete;
+
+    std::vector<rps_timeout> rps_queue_timeout;
 
     TCPclient():TCPhelper(){}
 
@@ -64,16 +73,10 @@ public:
 
     // Ping when error in reponds timeout.
     bool pinger(int fd);
-};
 
-/*
-class TCPserver: public TCPhelper{
-    // Make a server socket TCP/IP
-    int server_echo(int port_num);
+    void timeout_clock();
 
-    // Acceptor for a new client connection
-    int acceptor(int server_fd, std::vector<int>& input_fds, fd_set& master,int& fdmax, client_list& client_socket_list);
+    void msg_confirm(const std::string rps);
 };
-*/
 
 #endif // TCPHELPER_H
