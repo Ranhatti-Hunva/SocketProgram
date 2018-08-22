@@ -19,10 +19,10 @@ int client_list::set_user_name(int fd_num, const char* user_name)
         {
             close(client_list[i].num_socket);
             client_list[i].num_socket = fd_num;
+            client_list[i].is_online = true;
             is_exist = true;
         };
     };
-
 
     for (unsigned long i=0; i< client_list.size(); i++)
     {
@@ -32,6 +32,7 @@ int client_list::set_user_name(int fd_num, const char* user_name)
                 client_list.erase(client_list.begin()+static_cast<long>(i));
             }else{
                 strcpy(client_list[i].user_name,user_name);
+                client_list[i].is_online = true;
             };
             return 0;
         };
@@ -111,6 +112,15 @@ int client_list::get_fd_by_user_name(const char* user_name)
         };
     };
     return -1;
+};
+
+int client_list::is_online(int fd_num){
+
+    return fd_num;
+};
+
+void client_list::off_client(int fd_num){
+
 };
 
 

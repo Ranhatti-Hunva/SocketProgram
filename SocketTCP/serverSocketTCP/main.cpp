@@ -61,7 +61,7 @@ int main()
     scoped_thread sendThread(std::thread(send_TCP,ref(msg_wts),ref(client_socket_list),ref(server_helper), ref(finish)));
 
     scoped_thread timeoutThread(thread(server_helper.timeout_clocker, ref(finish), ref(client_socket_list)));
-    
+
     while(!finish)
     {
         server_helper.reciver(server_fd, client_socket_list, msg_wts);

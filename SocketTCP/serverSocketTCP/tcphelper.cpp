@@ -270,7 +270,7 @@ int TCPserver::reciver(int server_fd, client_list& client_socket_list, msg_queue
     if (select(this->fd_max+1,&read_fds, nullptr, nullptr, &general_tv) <0)
     {
         perror("=> Select");
-        return 0;
+        exit(EXIT_FAILURE);
     };
     locker.unlock();
 
