@@ -115,7 +115,7 @@ bool TCPhelper::send_msg(int fd, std::string msg, std::vector<rps_timeout>& rps_
             if (status < 0)
             {
                 printf("=> Sending failure !!!");
-                if (try_times++ < 3)
+                if (try_times++ > 3)
                 {
                     return false;
                 };
@@ -129,7 +129,7 @@ bool TCPhelper::send_msg(int fd, std::string msg, std::vector<rps_timeout>& rps_
         else
         {
             printf("=> Socket is not ready to send data!! \n");
-            if (try_times++ < 3)
+            if (try_times++ > 3)
             {
                 printf("=> Error on sending message");
                 return false;
