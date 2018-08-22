@@ -176,7 +176,7 @@ int TCPclient::connect_with_timeout(struct addrinfo *server_infor){
     if ((client_fd = socket(server_infor->ai_family, server_infor->ai_socktype, server_infor->ai_protocol)) < 0)
     {
         perror("=> Socket failed");
-        exit(EXIT_FAILURE);
+        return -1;
     }
     else
     {
