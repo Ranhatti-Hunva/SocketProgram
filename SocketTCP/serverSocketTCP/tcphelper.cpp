@@ -360,11 +360,18 @@ void TCPserver::timeout_clocker(bool& end_connection, client_list& client_socket
 {
     while(!end_connection)
     {
-        std::chrono::duration<float> duration = std::chrono::system_clock::now() - rps_timeout_list.front().timeout;
-        if(duration.count() > timeout)
+        if(!rps_timeout_list.empty())
         {
-            client_socket_list.off_client(rps_timeout_list.front().socket);
-            rps_timeout_list.erase(rps_timeout_list.begin());
+            std::chrono::duration<float> duration = std::chrono::system_clock::now() - rps_timeout_list.front().timeout;
+            if(duration.count() > timeout)
+            {
+                client_socket_list.off_client(rps_timeout_list.front().socket);
+                rps_timeout_list.erase(rps_timeout_list.begin());
+            };
+        }
+        else
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
         };
     };
 }
