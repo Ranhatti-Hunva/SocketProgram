@@ -2,7 +2,11 @@
 
 
 // TCPhelper contructor, menthod, .....
-TCPhelper::TCPhelper(){
+std::vector<TCPhelper::rps_timeout> TCPhelper::rps_timeout_list;
+const int TCPhelper::timeout;
+
+TCPhelper::TCPhelper()
+{
     FD_ZERO(&master);
     fd_max = 0;
 
@@ -10,7 +14,8 @@ TCPhelper::TCPhelper(){
     general_tv.tv_usec = 0;
 }
 
-struct addrinfo* TCPhelper::get_addinfo_list(std::string host_name, int port_num){
+struct addrinfo* TCPhelper::get_addinfo_list(std::string host_name, int port_num)
+{
     struct addrinfo* infor_list;        // servinfor is linked-list which contain all address information.
     long status;                        // Check error from getaddrinfor().Status return no-zero if there's an error.
 
@@ -19,7 +24,8 @@ struct addrinfo* TCPhelper::get_addinfo_list(std::string host_name, int port_num
     hints.ai_family = AF_INET;          // Fill information for the hint. APF_INET: use IPv4,
     hints.ai_socktype = SOCK_STREAM;    // SOCK_STREAM: TCP/IP menthod.
 
-    if(host_name.empty()){
+    if(host_name.empty())
+    {
         hints.ai_flags = AI_PASSIVE;    // AI_PASSIVE: assigned the address of local host tho the socket structure.
         status = getaddrinfo(nullptr, std::to_string(port_num).c_str(), &hints, &infor_list);
     }
@@ -37,35 +43,37 @@ struct addrinfo* TCPhelper::get_addinfo_list(std::string host_name, int port_num
     return infor_list;
 };
 
-bool TCPhelper::unpacked_msg(char* buffer, std::string& msg_incomplete, char& ID_msg_incomplete){
+bool TCPhelper::unpacked_msg(char* buffer, std::string& msg_incomplete, char& ID_msg_incomplete)
+{
     char* p = buffer;
     while(*p != 0)
     {
         switch (*p)
         {
-            case 2:
-            {
-                msg_incomplete.clear();
-                p++;
-                ID_msg_incomplete = *p;
-                break;
-            };
-            case 3:
-            {
-                return true;
-            };
-            default:
-            {
-                msg_incomplete = msg_incomplete + *p;
-                break;
-            };
+        case 2:
+        {
+            msg_incomplete.clear();
+            p++;
+            ID_msg_incomplete = *p;
+            break;
+        };
+        case 3:
+        {
+            return true;
+        };
+        default:
+        {
+            msg_incomplete = msg_incomplete + *p;
+            break;
+        };
         };
         p++;
     };
     return false;
 }
 
-char TCPhelper::packed_msg(std::string& msg){
+char TCPhelper::packed_msg(std::string& msg)
+{
     static char ID = 1;
     while ((ID==0)||(ID==2)||(ID==3))
     {
@@ -83,14 +91,16 @@ char TCPhelper::packed_msg(std::string& msg){
 
 bool TCPhelper::send_msg(int fd, std::string msg, std::vector<rps_timeout>& rps_queue_timeout, bool& is_rps)
 {
+    // Packed and attack the ID for msg. ID is a char.
     char ID_message = this->packed_msg(msg);
 
-    char send_buffer[bufsize];
-    memset(&send_buffer, 0, bufsize);
+    char send_buffer[bufsize] = {0};
 
     // What happend if msg is longer than bufsize??
     strcpy(send_buffer, msg.c_str());
 
+
+    // Put all message to buffer.
     fd_set send_fds;
 
     unsigned long total_bytes, byte_left, sended_bytes;
@@ -114,20 +124,23 @@ bool TCPhelper::send_msg(int fd, std::string msg, std::vector<rps_timeout>& rps_
             long status = send(fd, send_buffer+sended_bytes, byte_left, 0);
             if (status < 0)
             {
-                printf("=> Sending failure !!!");
+                // Undefined error on send().
                 if (try_times++ > 3)
                 {
+                    printf("=> Sending failure !!!");
                     return false;
                 };
             }
             else
             {
+                // Send a part of message.
                 sended_bytes += static_cast<unsigned long>(status);
                 byte_left -= static_cast<unsigned long>(status);
             };
         }
         else
         {
+            // Timeout when socket buffer is full.
             printf("=> Socket is not ready to send data!! \n");
             if (try_times++ > 3)
             {
@@ -137,20 +150,17 @@ bool TCPhelper::send_msg(int fd, std::string msg, std::vector<rps_timeout>& rps_
         };
     };
 
-    // Return ID to queue.
-    if (!is_rps){
+    // Save ID massge to waiting respond.
+    if (!is_rps)
+    {
         rps_timeout timepoint;
         timepoint.ID = ID_message;
         timepoint.timeout = std::chrono::system_clock::now();
         timepoint.socket = fd;
         rps_queue_timeout.push_back(timepoint);
     };
-    std::cout << "Send "<< (int) ID_message << std::endl;
-
     return true;
 };
-
-std::vector<TCPhelper::rps_timeout> TCPhelper::rps_timeout_list;
 
 void TCPhelper::msg_confirm(const std::string rps)
 {
@@ -170,13 +180,14 @@ void TCPhelper::msg_confirm(const std::string rps)
 bool TCPclient::ping;
 char TCPclient::ping_msg_ID;
 
-int TCPclient::connect_with_timeout(struct addrinfo *server_infor){
+int TCPclient::connect_with_timeout(struct addrinfo *server_infor)
+{
     // Creat client socket
     int client_fd;
     if ((client_fd = socket(server_infor->ai_family, server_infor->ai_socktype, server_infor->ai_protocol)) < 0)
     {
         perror("=> Socket failed");
-        return -1;
+        exit(EXIT_FAILURE);
     }
     else
     {
@@ -244,7 +255,8 @@ int TCPclient::connect_with_timeout(struct addrinfo *server_infor){
     };
 };
 
-int TCPclient::recv_msg(int client_fd){
+int TCPclient::recv_msg(int client_fd)
+{
     fd_set read_fds;
     FD_ZERO(&read_fds);
 
@@ -252,12 +264,11 @@ int TCPclient::recv_msg(int client_fd){
     if (select(fd_max+1,&read_fds, nullptr, nullptr, &general_tv) <0)
     {
         perror("=> Select");
-        return -1;
+        exit(EXIT_FAILURE);
     };
 
     long num_byte;
-    char recv_buf[bufsize];
-    memset(&recv_buf,0,bufsize);
+    char recv_buf[bufsize] = {0};
 
     if (FD_ISSET(client_fd, &read_fds))
     {
@@ -266,6 +277,7 @@ int TCPclient::recv_msg(int client_fd){
         {
             if ((num_byte == -1) && ((errno == EAGAIN)|| (errno == EWOULDBLOCK)))
             {
+                // Recv() is still happening.
                 perror("=> Message is not gotten complete !!. See you next time");
                 return 0;
             }
@@ -273,10 +285,12 @@ int TCPclient::recv_msg(int client_fd){
             {
                 if (num_byte == 0)
                 {
+                    // Server force close socket
                     printf("=> Connection has been close\n");
                 }
                 else
                 {
+                    // Undifined error socket
                     printf("=> Error socket.");
                 };
                 return -1;
@@ -302,14 +316,16 @@ void TCPclient::timeout_clocker(bool& end_connection)
         {
             if (false == ping)
             {
+                // If no ping is processed, keep chech timeout for the first msg ID in the list
                 std::chrono::duration<float> duration = std::chrono::system_clock::now() - rps_timeout_list.front().timeout;
                 if(duration.count() > timeout)
                 {
-                        ping = true;
+                    ping = true;
                 };
             }
             else
             {
+                // If ping is processed, check rps of ping. If timeout, stop and restart socket.
                 bool rps_ping = false;
                 for (unsigned long i=0; i < rps_timeout_list.size(); i++)
                 {
@@ -325,6 +341,7 @@ void TCPclient::timeout_clocker(bool& end_connection)
                     };
                 };
 
+                // Rps_ping has been deleted by msg_confirm.
                 if(false == rps_ping)
                 {
                     ping = false;
@@ -333,7 +350,8 @@ void TCPclient::timeout_clocker(bool& end_connection)
         }
         else
         {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            // Should to use condition_variable().
+            std::this_thread::sleep_for(std::chrono::milliseconds(timeout));
         };
     };
 }

@@ -41,8 +41,6 @@ public:
 
     static std::vector<rps_timeout> rps_timeout_list;
 
-
-
     TCPhelper();
     // Get address information from host name.
     struct addrinfo* get_addinfo_list(std::string host_name, int port_num);

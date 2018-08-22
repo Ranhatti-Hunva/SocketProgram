@@ -120,7 +120,7 @@ bool TCPhelper::send_msg(int fd, std::string msg, bool& is_rps)
             if (status < 0)
             {
                 printf("=> Sending failure !!!");
-                if (try_times++ > 3)
+                if (try_times++ < 3)
                 {
                     return false;
                 };
@@ -134,13 +134,14 @@ bool TCPhelper::send_msg(int fd, std::string msg, bool& is_rps)
         else
         {
             printf("=> Socket is not ready to send data!! \n");
-            if (try_times++ > 3)
+            if (try_times++ < 3)
             {
                 printf("=> Error on sending message");
                 return false;
             };
         };
     };
+
     // Return ID to queue.
     if (!is_rps){
         rps_timeout timepoint;
@@ -314,10 +315,11 @@ int TCPserver::reciver(int server_fd, client_list& client_socket_list, msg_queue
 
                 bool is_msg_usable = this->unpacked_msg(recv_buffer, host_msg.msg_incompleted, host_msg.ID_msg_incompleted);
                 if (is_msg_usable)
-                {
-                    std::cout << "Message "<<(int) host_msg.ID_msg_incompleted <<" from client on socket " << client_fds[i] << ":" << host_msg.msg_incompleted <<std::endl;
+                {                    
                     if (host_msg.msg_incompleted.substr(0,3).compare("RSP"))
                     {
+                        std::cout << "Message "<<(int) host_msg.ID_msg_incompleted <<" from client on socket " << client_fds[i] << ":" << host_msg.msg_incompleted <<std::endl;
+
                         std::string RSP = "RSP";
                         std::string msg = RSP + host_msg.ID_msg_incompleted + "/";
                         msg_wts.push_respond(msg+std::to_string(client_fds[i]));

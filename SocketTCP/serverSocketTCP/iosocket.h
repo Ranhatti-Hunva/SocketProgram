@@ -30,7 +30,7 @@ void splits_string(const std::string& subject, std::vector<std::string>& contain
 
 //void send_TCP(user_command& user_command, client_list& client_socket_list, fd_set& master, int& fdmax, std::vector<int>& input_fds);
 
-void send_TCP(msg_queue& msg_wts, client_list& client_socket_list, TCPserver& server_helper, bool& finish);
+void send_TCP(msg_queue& msg_wts, client_list& client_socket_list, TCPserver& server_helper, bool& end_connection);
 
 void process_on_buffer_recv(const char* buffer, client_list& client_socket_list, int input_fd, msg_queue& msg_wts);
 

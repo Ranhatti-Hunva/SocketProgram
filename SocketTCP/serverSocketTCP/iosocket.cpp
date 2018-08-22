@@ -15,13 +15,13 @@ void splits_string(const std::string& subject, std::vector<std::string>& contain
     delete[] s;
 }
 
-void send_TCP(msg_queue& msg_wts, client_list& client_socket_list, TCPserver& server_helper, bool& finish)
+void send_TCP(msg_queue& msg_wts, client_list& client_socket_list, TCPserver& server_helper, bool& end_connection)
 {
     std::vector<std::string> container;
     int socket_for_client;
     client_information client_socket_information;
 
-    while(1)
+    while(!end_connection)
     {
         // Read terminal non-blocking.
         fd_set reader;
@@ -41,11 +41,12 @@ void send_TCP(msg_queue& msg_wts, client_list& client_socket_list, TCPserver& se
             };
         };
 
-        //
+        // Get and send msg or respond
         std::string msg;
         msg.clear();
         bool is_respond = false;
 
+        // Prioritize send all respond before send msg
         if (!msg_wts.respond_empty()){
             is_respond = true;
             msg = msg_wts.respond_get();
@@ -54,17 +55,18 @@ void send_TCP(msg_queue& msg_wts, client_list& client_socket_list, TCPserver& se
             msg = msg_wts.msg_get();
         }
 
-        // Send message
         if (!msg.empty())
         {            
-            // Server close echo-socket.
+
             if (!msg.compare("#"))
             {
-                finish = true;
+                 // Exit thread because of the wish of user.
+                end_connection = true;
                 break;
             }
             else
             {
+                // Send message
                 splits_string(msg, container);
                 // Does msg have 2 part?
                 if(container.size() == 2)
@@ -77,7 +79,7 @@ void send_TCP(msg_queue& msg_wts, client_list& client_socket_list, TCPserver& se
                     }
                     catch(...)
                     {
-                        printf("=>The folowing text is no a number !! \n");
+                        printf("=>The folowing text is not a number !! \n");
                         isNumber = false;
                     };
 
@@ -86,7 +88,7 @@ void send_TCP(msg_queue& msg_wts, client_list& client_socket_list, TCPserver& se
                         // Searching client.
                         if(client_socket_list.get_by_fd(socket_for_client, client_socket_information) < 0)
                         {
-                            printf("=>Don't have this socket in the list \n");
+                            printf("=>Don't have this socket in the list \n");                                                    
                         }
                         else
                         {
@@ -138,6 +140,13 @@ void process_on_buffer_recv(const char* buffer, client_list& client_socket_list,
                 if(client_socket_list.set_user_name(client_fd,container[1].c_str()) < 0)
                 {
                     printf("=> Error on inserting username for new socket!! \n");
+                }
+                else
+                {
+                    // Get file msg and send to client.
+                    // ................................
+
+
                 };
             }
             else
@@ -149,6 +158,10 @@ void process_on_buffer_recv(const char* buffer, client_list& client_socket_list,
                 if (forward_fd < 0)
                 {
                     message = "Sorry,"+container[1]+" hasn't connect to server!!"+"/"+std::to_string(client_fd);
+                    // Save msg with file name.
+                    // ........................
+
+
                 }
                 else
                 {
@@ -159,7 +172,7 @@ void process_on_buffer_recv(const char* buffer, client_list& client_socket_list,
                     message = str+"=>"+container[0]+"/"+std::to_string(forward_fd);
                 }
 
-                // Notify send_TCP wake up to send data.
+                // Push msg to msg waiting queue.
                 msg_wts.push_msg(message);
             };
         }

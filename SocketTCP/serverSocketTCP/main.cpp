@@ -56,13 +56,13 @@ int main()
     msg_queue msg_wts;
     msg_wts.clear();
 
-    bool finish = false;
+    bool end_connection = false;
 
-    scoped_thread sendThread(std::thread(send_TCP,ref(msg_wts),ref(client_socket_list),ref(server_helper), ref(finish)));
+    scoped_thread sendThread(std::thread(send_TCP,ref(msg_wts),ref(client_socket_list),ref(server_helper), ref(end_connection)));
 
-    scoped_thread timeoutThread(thread(server_helper.timeout_clocker, ref(finish), ref(client_socket_list)));
+    scoped_thread timeoutThread(thread(server_helper.timeout_clocker, ref(end_connection), ref(client_socket_list)));
 
-    while(!finish)
+    while(!end_connection)
     {
         server_helper.reciver(server_fd, client_socket_list, msg_wts);
     };

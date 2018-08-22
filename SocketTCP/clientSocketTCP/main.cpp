@@ -82,7 +82,7 @@ int main()
 
         /*------------------------------------------------------------------------------------------------------------*/
         // Connection success and start to communication.
-        printf("\n=> Enter # to end the connection \n\n");
+        printf("\n=> Welcome!! Enter # to end the connection \n\n");
 
         msg_queue msg_wts;      // queue for the massages are wating to send.
         msg_wts.clear();
@@ -90,7 +90,7 @@ int main()
         bool end_connection = false;
 
         // Start a new thread for sending message
-        scoped_thread sendThread(thread(send_TCP,ref(msg_wts), ref(client_helper), ref(client_fd),ref(end_connection)));
+        scoped_thread sendThread(thread(send_TCP, ref(msg_wts), ref(client_helper), ref(client_fd), ref(end_connection)));
 
         //Timout clocker
         scoped_thread timeoutThread(thread(client_helper.timeout_clocker, ref(end_connection)));
@@ -107,7 +107,7 @@ int main()
             else if (is_msg_usable == 1)
             {
                 if (client_helper.msg_incomplete.substr(0,3).compare("RSP")){
-                    cout << "Message "<< (int) client_helper.ID_msg_incomplete <<" from server :" << client_helper.msg_incomplete << endl;
+                    cout << "Message "<< static_cast<int>(client_helper.ID_msg_incomplete) <<" from server :" << client_helper.msg_incomplete << endl;
 
                     // Responde to server when get msg.
                     string RSP = "RSP";
