@@ -252,7 +252,7 @@ int TCPclient::recv_msg(int client_fd){
     if (select(fd_max+1,&read_fds, nullptr, nullptr, &general_tv) <0)
     {
         perror("=> Select");
-        exit(EXIT_FAILURE);
+        return -1;
     };
 
     long num_byte;
