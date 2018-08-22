@@ -30,13 +30,19 @@ protected:
 
     static const unsigned int bufsize = 256;
 
+    static const int timeout = 1;
+
+public:
     struct rps_timeout{
         char ID;
         std::chrono::system_clock::time_point timeout;
         int socket;
     };
 
-public:
+    static std::vector<rps_timeout> rps_timeout_list;
+
+
+
     TCPhelper();
     // Get address information from host name.
     struct addrinfo* get_addinfo_list(std::string host_name, int port_num);
@@ -49,6 +55,9 @@ public:
 
     // Send packed message.
     bool send_msg(int fd, std::string msg, std::vector<rps_timeout>& rps_queue_timeout, bool& is_rps);
+
+    // Get msg confirm
+    void msg_confirm(const std::string rps);
 };
 
 class TCPclient: public TCPhelper{
@@ -56,9 +65,14 @@ public:
     std::string msg_incomplete;
     char ID_msg_incomplete;
 
-    std::vector<rps_timeout> rps_queue_timeout;
+    static bool ping;
+    static char ping_msg_ID;
 
-    TCPclient():TCPhelper(){}
+    TCPclient():TCPhelper()
+    {
+        ping = false;
+        rps_timeout_list.clear();
+    }
 
     // Creat new socket and connect to a server with timeout. Let decision to re-connect on user.
     // If fail by error socket or timeout, return -1;
@@ -72,11 +86,11 @@ public:
     int recv_msg(int fd);
 
     // Ping when error in reponds timeout.
-    bool pinger(int fd);
+    // bool pinger(int fd);
 
-    void timeout_clock();
+    static void timeout_clocker(bool& end_connection);
 
-    void msg_confirm(const std::string rps);
+
 };
 
 #endif // TCPHELPER_H

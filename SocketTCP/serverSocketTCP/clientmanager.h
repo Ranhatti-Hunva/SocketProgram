@@ -18,6 +18,7 @@ struct  client_information
 //    std::queue<std::string> msg_queue;
     std::string msg_incompleted;
     char ID_msg_incompleted;
+    bool is_online;
 };
 
 class client_list{
@@ -37,6 +38,10 @@ public:
     int get_by_order(unsigned long order,  client_information& contain_information);
 
     int get_fd_by_user_name(const char* user_name);
+
+    int is_online(int fd_num);
+
+    void off_client(int fd_num);
 
     unsigned long size();
 };

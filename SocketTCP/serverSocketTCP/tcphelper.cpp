@@ -71,6 +71,11 @@ bool TCPhelper::unpacked_msg(char* buffer, std::string& msg_incomplete, char& ID
 
 char TCPhelper::packed_msg(std::string& msg){
     static char ID = 1;
+    while ((ID==0)||(ID==2)||(ID==3))
+    {
+        ID++;
+    };
+
     char begin_c = 2;
     char end_c = 3;
 
@@ -80,7 +85,7 @@ char TCPhelper::packed_msg(std::string& msg){
     return ID++;
 }
 
-bool TCPhelper::send_msg(int fd, std::string msg)
+bool TCPhelper::send_msg(int fd, std::string msg, bool& is_rps)
 {
     char ID_message = this->packed_msg(msg);
 
@@ -101,14 +106,13 @@ bool TCPhelper::send_msg(int fd, std::string msg)
 
     while(sended_bytes < total_bytes)
     {
-        std::unique_lock<std::mutex> locker(fd_set_mutex);
-        send_fds = master;
-        if (select(fd_max+1,nullptr, &send_fds, nullptr, &general_tv) <0)
+        FD_ZERO(&send_fds);
+        FD_SET(fd,&send_fds);
+        if (select(fd+1,nullptr, &send_fds, nullptr, &general_tv) <0)
         {
             perror("=>Select ");
-            exit(EXIT_FAILURE);
+            return false;
         };
-        locker.unlock();
 
         if(FD_ISSET(fd, &send_fds))
         {
@@ -137,10 +141,33 @@ bool TCPhelper::send_msg(int fd, std::string msg)
             };
         };
     };
+    // Return ID to queue.
+    if (!is_rps){
+        rps_timeout timepoint;
+        timepoint.ID = ID_message;
+        timepoint.timeout = std::chrono::system_clock::now();
+        timepoint.socket = fd;
+        rps_timeout_list.push_back(timepoint);
+    };
 
-     std::cout << "Send " << (int) ID_message << std::endl;
     return true;
 };
+
+std::vector<TCPhelper::rps_timeout> TCPhelper::rps_timeout_list;
+
+void TCPhelper::msg_confirm(const std::string rps)
+{
+    const char ID_msg = rps[3];
+    unsigned long i;
+    for (i=0; i < this->rps_timeout_list.size(); i++)
+    {
+        if(rps_timeout_list[i].ID == ID_msg)
+        {
+            rps_timeout_list.erase(rps_timeout_list.begin()+static_cast<long>(i));
+            break;
+        };
+    };
+}
 
 // TCPserver contructor, menthod, .....
 int TCPserver::server_echo(int port_num)
@@ -293,15 +320,17 @@ int TCPserver::reciver(int server_fd, client_list& client_socket_list, msg_queue
                     {
                         std::string RSP = "RSP";
                         std::string msg = RSP + host_msg.ID_msg_incompleted + "/";
-
-                         std::cout << "Recv " << (int) host_msg.ID_msg_incompleted << std::endl;
-
                         msg_wts.push_respond(msg+std::to_string(client_fds[i]));
-                        process_on_buffer_recv(host_msg.msg_incompleted.c_str(), client_socket_list, client_fds[i], msg_wts);
+
+                        if(host_msg.msg_incompleted.compare("PING"))
+                        {
+                            process_on_buffer_recv(host_msg.msg_incompleted.c_str(), client_socket_list, client_fds[i], msg_wts);
+                        };
                     }
                     else
                     {
-                        // Deleted respond elelemt.
+                        // Delete key message timeout.
+                        this->msg_confirm(host_msg.msg_incompleted);
                     };
                 };
             };
@@ -325,4 +354,17 @@ void TCPserver::closer(int server_fd, client_list& client_socket_list)
     locker.unlock();
 
     client_socket_list.delete_fs_num(server_fd);
+}
+
+void TCPserver::timeout_clocker(bool& end_connection, client_list& client_socket_list)
+{
+    while(!end_connection)
+    {
+        std::chrono::duration<float> duration = std::chrono::system_clock::now() - rps_timeout_list.front().timeout;
+        if(duration.count() > timeout)
+        {
+            client_socket_list.off_client(rps_timeout_list.front().socket);
+            rps_timeout_list.erase(rps_timeout_list.begin());
+        };
+    };
 }

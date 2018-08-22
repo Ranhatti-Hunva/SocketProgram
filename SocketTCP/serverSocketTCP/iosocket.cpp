@@ -94,13 +94,15 @@ void send_TCP(msg_queue& msg_wts, client_list& client_socket_list, TCPserver& se
                             if (!container[0].compare("#"))
                             {
                                 server_helper.closer(socket_for_client,client_socket_list);
-
                                 printf("=> Closed connection with soket %d.\n",socket_for_client);
                             }
                             else // Send msg to client.
                             {
-                                // Return ??
-                                server_helper.send_msg(socket_for_client, container[0]);
+                                if(!server_helper.send_msg(socket_for_client, container[0], is_respond))
+                                {
+                                    printf("=> Error on scket %d.\n",socket_for_client);
+                                    server_helper.closer(socket_for_client,client_socket_list);
+                                };
                             };
                         };
                     };
@@ -142,6 +144,8 @@ void process_on_buffer_recv(const char* buffer, client_list& client_socket_list,
             {
                 // Format message
                 int forward_fd = client_socket_list.get_fd_by_user_name(container[1].c_str());
+                forward_fd = client_socket_list.is_online(forward_fd);
+
                 if (forward_fd < 0)
                 {
                     message = "Sorry,"+container[1]+" hasn't connect to server!!"+"/"+std::to_string(client_fd);

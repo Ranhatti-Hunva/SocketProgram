@@ -16,6 +16,7 @@
 #include <thread>
 #include <mutex>
 #include <vector>
+#include <chrono>
 #include <fcntl.h>
 
 #include "clientmanager.h"
@@ -30,7 +31,17 @@ protected:
     struct timeval general_tv;
 
     static const unsigned int bufsize = 256;
+
+    static const int timeout = 1;
 public:
+    struct rps_timeout{
+        char ID;
+        std::chrono::system_clock::time_point timeout;
+        int socket;
+    };
+
+    static std::vector<rps_timeout> rps_timeout_list;
+
     TCPhelper();
     // Get address information from host name.
     struct addrinfo* get_addinfo_list(std::string host_name, int port_num);
@@ -42,13 +53,17 @@ public:
     bool unpacked_msg(char* buffer, std::string& msg_incomplete, char& ID_msg_incomplete);
 
     // Send packed message.
-    bool send_msg(int fd, std::string msg);
+    bool send_msg(int fd, std::string msg, bool& is_rps);
+
+    // Get message confirm
+    void msg_confirm(const std::string rps);
 };
 
 class TCPserver:public TCPhelper
 {
     std::vector<int> client_fds;
-public:
+public:    
+
     TCPserver():TCPhelper()
     {
         client_fds.clear();
@@ -64,6 +79,9 @@ public:
 
     // Close socket.
     void closer(int server_fd, client_list& client_socket_list);
+
+    // Timeout locker
+    static void timeout_clocker(bool& end_connection, client_list& client_socket_list);
 };
 
 #endif // TCPHELPER_H

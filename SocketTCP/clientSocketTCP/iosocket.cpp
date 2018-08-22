@@ -4,78 +4,91 @@
 //void send_TCP(user_command& user_command, fd_set& master, int& socket_fd)
 void send_TCP(msg_queue& msg_wts, TCPclient& client_helper, int& socket_fd, bool& end_connection)
 {
+    // If just login, send a msg as format */+user_name
+    msg_wts.push_msg("*/"+user_name);
+
     std::string user_cmd_str;
     user_cmd_str.clear();
 
-    bool is_login = true;
     while(!end_connection)
     {
-        if (is_login)
-        {
-            // If just login, send a msg as format */+user_name
-            msg_wts.push_msg("*/"+user_name);
-            is_login = false;
-        }
-        else
-        {
-            // Get unbocking user input from terminal.
-            fd_set reader;
-            FD_SET(0,&reader);
+        // Get unbocking user input from terminal.
+        fd_set reader;
+        FD_SET(0,&reader);
 
-            struct timeval general_tv;
-            general_tv.tv_sec = 0;
-            general_tv.tv_usec = 5000;
+        struct timeval general_tv;
+        general_tv.tv_sec = 0;
+        general_tv.tv_usec = 5000;
 
-            select(1,&reader, nullptr, nullptr, &general_tv);
-            if (FD_ISSET(0, &reader))
+        select(1,&reader, nullptr, nullptr, &general_tv);
+        if (FD_ISSET(0, &reader))
+        {
+            getline(std::cin, user_cmd_str);
+            if(!user_cmd_str.empty())
             {
-                getline(std::cin, user_cmd_str);
-                if(!user_cmd_str.empty()){
-                    msg_wts.push_msg(user_cmd_str);
-                };
+                msg_wts.push_msg(user_cmd_str);
             };
         };
 
-        std::string msg;
         bool is_respond = false;
-        msg.clear();
-
-        if (!msg_wts.respond_empty()){
-            is_respond = true;
-            msg = msg_wts.respond_get();
-        }
-        else if (!msg_wts.msg_empty())
+        if(false == client_helper.ping)
         {
-            is_respond = false;
-            msg = msg_wts.msg_get();
-        };
+            std::string msg;
+            msg.clear();
 
-        if (!msg.empty())
-        {
-            if(msg.compare("#"))
+            if (!msg_wts.respond_empty())
             {
-                // Send msg.
-                if(!client_helper.send_msg(socket_fd,msg, client_helper.rps_queue_timeout, is_respond))
+                is_respond = true;
+                msg = msg_wts.respond_get();
+            }
+            else if (!msg_wts.msg_empty())
+            {
+                is_respond = false;
+                msg = msg_wts.msg_get();
+            };
+
+            if (!msg.empty())
+            {
+                if(msg.compare("#"))
                 {
-                    printf("=> Sending failure !!!");
-                    // client_helper.pinger(socket_fd);
+                    // Send msg.
+                    if(!client_helper.send_msg(socket_fd, msg, client_helper.rps_timeout_list, is_respond))
+                    {
+                        printf("=> Sending failure !!!");
+                        // Exit thread.
+                        end_connection = true;
+                        break;
+                    }
+                    else
+                    {
+                        (is_respond)?msg_wts.pop_respond():msg_wts.pop_msg();
+                    };
                 }
                 else
                 {
-                    (is_respond)?msg_wts.pop_respond():msg_wts.pop_msg();
+                    // Exit thread.
+                    end_connection = true;
+                    break;
                 };
             }
             else
             {
-                // Exit thread.
-                end_connection = true;
-                break;
+                sleep(1);
             };
         }
         else
         {
-            sleep(1);
-        };
+            // Send ping;
+            if(!client_helper.send_msg(socket_fd, "PING", client_helper.rps_timeout_list, is_respond))
+            {
+                printf("=> Sending failure !!!");
+                // Exit thread.
+                end_connection = true;
+                break;
+            };
+            client_helper.ping_msg_ID = client_helper.rps_timeout_list.back().ID;
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+        }
     };
 };
 
@@ -105,6 +118,7 @@ int is_reconnect(int& client_fd)
         }
     };
 };
+
 
 
 

@@ -92,6 +92,9 @@ int main()
         // Start a new thread for sending message
         scoped_thread sendThread(thread(send_TCP,ref(msg_wts), ref(client_helper), ref(client_fd),ref(end_connection)));
 
+        //Timout clocker
+        scoped_thread timeoutThread(thread(client_helper.timeout_clocker, ref(end_connection)));
+
         // Listern incomming message
         while(!end_connection)
         {
@@ -103,20 +106,17 @@ int main()
             }
             else if (is_msg_usable == 1)
             {
-                cout << "Message "<< (int) client_helper.ID_msg_incomplete <<" from server :" << client_helper.msg_incomplete << endl;
-
                 if (client_helper.msg_incomplete.substr(0,3).compare("RSP")){
-                    // Repondre to server when get msg.
+                    cout << "Message "<< (int) client_helper.ID_msg_incomplete <<" from server :" << client_helper.msg_incomplete << endl;
+
+                    // Responde to server when get msg.
                     string RSP = "RSP";
                     string respond = RSP + client_helper.ID_msg_incomplete;
-
-                     std::cout << "Recv " << (int) client_helper.ID_msg_incomplete << std::endl;
-
                     msg_wts.push_respond(respond);
                 }
                 else
                 {
-                    // Delete key message timout.
+                    // Delete key message timeout.
                     client_helper.msg_confirm(client_helper.msg_incomplete);
                 };
             };
