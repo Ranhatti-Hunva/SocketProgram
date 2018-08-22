@@ -116,11 +116,29 @@ int client_list::get_fd_by_user_name(const char* user_name)
 
 int client_list::is_online(int fd_num){
 
-    return fd_num;
+    client_information client;
+    if(get_by_fd(fd_num, client) == 0)
+    {
+        if (client.is_online){
+            return fd_num;
+        }
+        else
+        {
+            return -1;
+        }
+    }
+    else
+    {
+        return -1;
+    }
 };
 
 void client_list::off_client(int fd_num){
-
+    client_information client;
+    if(get_by_fd(fd_num, client) == 0)
+    {
+        client.is_online = false;
+    }
 };
 
 
