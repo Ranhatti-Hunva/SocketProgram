@@ -58,7 +58,7 @@ int main()
 
     bool end_connection = false;
 
-    scoped_thread sendThread(std::thread(send_TCP,ref(msg_wts),ref(client_socket_list),ref(server_helper), ref(end_connection)));
+    scoped_thread sendThread(std::thread(send_TCP,ref(msg_wts), ref(client_socket_list),ref(server_helper), ref(end_connection)));
 
     scoped_thread timeoutThread(thread(server_helper.timeout_clocker, ref(end_connection), ref(client_socket_list)));
 

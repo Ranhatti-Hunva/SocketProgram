@@ -46,7 +46,7 @@ public:
     // Get address information from host name.
     struct addrinfo* get_addinfo_list(std::string host_name, int port_num);
 
-    // Packed msg ad format <2(char)><msg><3(char)> (2 is Start of Text, 3 is End of Text in ASCII).
+    // Packed msg ad format <2(char)><ID_msg><content_msg><3(char)> (2 is Start of Text, 3 is End of Text in ASCII).
     char packed_msg(std::string& msg);
 
     // Unpacked msg.

@@ -10,8 +10,8 @@ TCPhelper::TCPhelper()
     FD_ZERO(&master);
     fd_max = 0;
 
-    general_tv.tv_sec = 1;
-    general_tv.tv_usec = 0;
+    general_tv.tv_sec = 0;
+    general_tv.tv_usec = 5000;
 }
 
 struct addrinfo* TCPhelper::get_addinfo_list(std::string host_name, int port_num)
@@ -326,24 +326,27 @@ void TCPclient::timeout_clocker(bool& end_connection)
             else
             {
                 // If ping is processed, check rps of ping. If timeout, stop and restart socket.
-                bool rps_ping = false;
-                for (unsigned long i=0; i < rps_timeout_list.size(); i++)
+                bool flag_ping = false;
+                unsigned long i;
+                for (i=0; i < rps_timeout_list.size(); i++)
                 {
                     if(rps_timeout_list[i].ID == ping_msg_ID)
                     {
                         std::chrono::duration<float> duration = std::chrono::system_clock::now() - rps_timeout_list[i].timeout;
                         if (duration.count() > timeout)
                         {
+                            rps_timeout_list.erase(rps_timeout_list.begin()+static_cast<long>(i));
                             end_connection = true;
-                            rps_ping = true;
+                            flag_ping = true;
                         };
                         break;
                     };
                 };
 
                 // Rps_ping has been deleted by msg_confirm.
-                if(false == rps_ping)
+                if(false == flag_ping)
                 {
+                    rps_timeout_list.erase(rps_timeout_list.begin()+static_cast<long>(i));
                     ping = false;
                 };
             }
