@@ -36,7 +36,8 @@ void send_TCP(msg_queue& msg_wts, client_list& client_socket_list, TCPserver& se
         {
             std::string user_cmd_str;
             getline(std::cin, user_cmd_str);
-            if(!user_cmd_str.empty()){
+            if(!user_cmd_str.empty())
+            {
                 msg_wts.push_msg(user_cmd_str);
             };
         };
@@ -47,20 +48,23 @@ void send_TCP(msg_queue& msg_wts, client_list& client_socket_list, TCPserver& se
         bool is_respond = false;
 
         // Prioritize send all respond before send msg
-        if (!msg_wts.respond_empty()){
+        if (!msg_wts.respond_empty())
+        {
             is_respond = true;
             msg = msg_wts.respond_get();
-        } else if(!msg_wts.msg_empty()) {
+        }
+        else if(!msg_wts.msg_empty())
+        {
             is_respond = false;
             msg = msg_wts.msg_get();
         }
 
         if (!msg.empty())
-        {            
+        {
 
             if (!msg.compare("#"))
             {
-                 // Exit thread because of the wish of user.
+                // Exit thread because of the wish of user.
                 end_connection = true;
                 break;
             }
@@ -88,7 +92,7 @@ void send_TCP(msg_queue& msg_wts, client_list& client_socket_list, TCPserver& se
                         // Searching client.
                         if(client_socket_list.get_by_fd(socket_for_client, client_socket_information) < 0)
                         {
-                            printf("=>Don't have this socket in the list \n");                                                    
+                            printf("=>Don't have this socket in the list \n");
                         }
                         else
                         {
@@ -127,7 +131,7 @@ void process_on_buffer_recv(const char* buffer, client_list& client_socket_list,
 {
     std::string bufstr = buffer;
     std::vector<std::string> container;
-    std::string message;
+
 
     if (bufstr.compare("#"))
     {
@@ -144,24 +148,68 @@ void process_on_buffer_recv(const char* buffer, client_list& client_socket_list,
                 else
                 {
                     // Get file msg and send to client.
-                    // ................................
+                    std::ifstream read_file;
+                    std::string nameof = "../build-serverSocketTCP-Desktop_Qt_5_11_1_clang_64bit-Debug/clientmsg/"+container[1]+".txt";
+                    read_file.open(nameof);
 
+                    if (!read_file.fail())
+                    {
+                        std::string msg;
+                        std::stack<std::string> msg_lock_in;
 
+                        int forward_fd = client_socket_list.get_fd_by_user_name(container[1].c_str());
+                        forward_fd = client_socket_list.is_online(forward_fd);
+
+                        while(!read_file.eof())
+                        {
+                            getline(read_file,msg);
+                            msg = msg + "/" + std::to_string(forward_fd);
+                            msg_lock_in.push(msg);
+                        };
+                        msg_lock_in.pop();
+
+                        while(!msg_lock_in.empty())
+                        {
+                            msg_wts.push_msg(msg_lock_in.top());
+                            msg_lock_in.pop();
+                        };
+
+                        read_file.close();
+
+                        if( remove( nameof.c_str() ) != 0 )
+                            perror( "=> Error deleting file" );
+                        else
+                            puts( "=> File successfully deleted" );
+                    }
+                    else
+                    {
+                        printf("=> History msg of this client is clear!! \n");
+                        read_file.close();
+                    };
                 };
             }
             else
             {
+                std::string message;
                 // Format message
                 int forward_fd = client_socket_list.get_fd_by_user_name(container[1].c_str());
                 forward_fd = client_socket_list.is_online(forward_fd);
 
                 if (forward_fd < 0)
                 {
-                    message = "Sorry,"+container[1]+" hasn't connect to server!!"+"/"+std::to_string(client_fd);
-                    // Save msg with file name.
-                    // ........................
+                    message = "Sorry,"+container[1]+" can't rely you right now!!"+"/"+std::to_string(client_fd);
+                    // Save msg with file name is the name of forward user.
+                    std::ofstream write_file;
+                    std::string nameof = "../build-serverSocketTCP-Desktop_Qt_5_11_1_clang_64bit-Debug/clientmsg/"+container[1]+".txt";
+                    write_file.open(nameof, std::fstream::app);
 
+                    client_information host_msg;
+                    client_socket_list.get_by_fd(client_fd, host_msg);
+                    std::string str(host_msg.user_name);
 
+                    write_file <<  str+"=>"+container[0]  << std::endl;
+
+                    write_file.close();
                 }
                 else
                 {
@@ -171,7 +219,6 @@ void process_on_buffer_recv(const char* buffer, client_list& client_socket_list,
                     std::string str(host_msg.user_name);
                     message = str+"=>"+container[0]+"/"+std::to_string(forward_fd);
                 }
-
                 // Push msg to msg waiting queue.
                 msg_wts.push_msg(message);
             };

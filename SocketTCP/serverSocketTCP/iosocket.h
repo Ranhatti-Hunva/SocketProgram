@@ -17,6 +17,8 @@
 #include <mutex>
 #include <vector>
 #include <fcntl.h>
+#include <fstream>
+#include <stack>
 
 #include "clientmanager.h"
 #include "msgqueue.h"
