@@ -56,12 +56,22 @@ int main()
 
     /*------------------------------------------------------------------------------------------------------------*/
     // User login.
+    user_name = "All";
     printf("=> Please inser user's names before start program:");
-    getline(cin, user_name);
-    if(user_name.empty())
+    while(!user_name.compare("All"))
     {
-        printf("=> Sorry!! Login fail.... \n");
-        exit(EXIT_FAILURE);
+        getline(cin, user_name);
+
+        if(user_name.empty())
+        {
+            printf("=> Sorry!! Login fail.... \n");
+            exit(EXIT_FAILURE);
+        };
+
+        if(!user_name.compare("All"))
+        {
+            printf("=> Sorry!! You can use this name. Plz re-insert username:\n");
+        };
     };
 
     // Start program.

@@ -155,7 +155,7 @@ void process_on_buffer_recv(const char* buffer, client_list& client_socket_list,
                     if (!read_file.fail())
                     {
                         std::string msg;
-                        std::stack<std::string> msg_lock_in;
+                        // std::stack<std::string> msg_lock_in;
 
                         int forward_fd = client_socket_list.get_fd_by_user_name(container[1].c_str());
                         forward_fd = client_socket_list.is_online(forward_fd);
@@ -163,15 +163,11 @@ void process_on_buffer_recv(const char* buffer, client_list& client_socket_list,
                         while(!read_file.eof())
                         {
                             getline(read_file,msg);
-                            msg = msg + "/" + std::to_string(forward_fd);
-                            msg_lock_in.push(msg);
-                        };
-                        msg_lock_in.pop();
-
-                        while(!msg_lock_in.empty())
-                        {
-                            msg_wts.push_msg(msg_lock_in.top());
-                            msg_lock_in.pop();
+                            if(!msg.empty())
+                            {
+                                msg = msg + "/" + std::to_string(forward_fd);
+                                msg_wts.push_msg(msg);
+                            };
                         };
 
                         read_file.close();
@@ -188,7 +184,7 @@ void process_on_buffer_recv(const char* buffer, client_list& client_socket_list,
                     };
                 };
             }
-            else
+            else if(container[1].compare("All"))
             {
                 std::string message;
                 // Format message
@@ -218,9 +214,36 @@ void process_on_buffer_recv(const char* buffer, client_list& client_socket_list,
 
                     std::string str(host_msg.user_name);
                     message = str+"=>"+container[0]+"/"+std::to_string(forward_fd);
-                }
+                };
                 // Push msg to msg waiting queue.
                 msg_wts.push_msg(message);
+            }
+            else
+            {
+                client_information host_msg;
+                client_socket_list.get_by_fd(client_fd, host_msg);
+                std::string str(host_msg.user_name);
+
+                std::string head_msg;
+                head_msg = str+"=>"+container[0]+"/";
+
+                unsigned long num_client =  client_socket_list.size();
+                for (unsigned long i=0; i< num_client; i++)
+                {
+                    std::string message;
+                    client_information forward_msg;
+                    client_socket_list.get_by_order(i,forward_msg);
+
+                    client_information host_msg;
+                    client_socket_list.get_by_fd(client_fd, host_msg);
+
+                    if ((forward_msg.is_online) && (strcmp(forward_msg.user_name, host_msg.user_name)))
+                    {
+                        message = head_msg + std::to_string(forward_msg.num_socket);
+                        msg_wts.push_msg(message);
+                        message.clear();
+                    };
+                };
             };
         }
         else

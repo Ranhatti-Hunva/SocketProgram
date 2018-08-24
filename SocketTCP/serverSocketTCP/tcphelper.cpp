@@ -323,6 +323,7 @@ int TCPserver::reciver(int server_fd, client_list& client_socket_list, msg_queue
                         std::string RSP = "RSP";
                         std::string msg = RSP + host_msg.ID_msg_incompleted + "/";
                         msg_wts.push_respond(msg+std::to_string(client_fds[i]));
+                        printf("=> Have sent RPS for message %d for socket %d \n", host_msg.ID_msg_incompleted, client_fds[i]);
 
                         if(host_msg.msg_incompleted.compare("PING"))
                         {
@@ -333,6 +334,7 @@ int TCPserver::reciver(int server_fd, client_list& client_socket_list, msg_queue
                     {
                         // Delete key message timeout.
                         this->msg_confirm(host_msg.msg_incompleted);
+                        printf("=> Get RPS for message %d for socket %d \n", host_msg.msg_incompleted[3], client_fds[i]);
                     };
                 };
             };

@@ -57,7 +57,7 @@ int client_list::get_by_fd(int fd_num, client_information& contain_information)
 int client_list::get_by_order(unsigned long order,  client_information& contain_information)
 {
     std::lock_guard<std::mutex> guard(client_mutext);
-    if ((order>0) && (order<client_list.size()))
+    if (order<client_list.size())
     {
         contain_information =  client_list[order];
         return 0;
@@ -76,6 +76,7 @@ int client_list::delete_fs_num(int fd_num)
         if (client_list[i].num_socket == fd_num)
         {
             client_list[i].num_socket = -1;
+            client_list[i].is_online = false;
             return 0;
         };
     };
