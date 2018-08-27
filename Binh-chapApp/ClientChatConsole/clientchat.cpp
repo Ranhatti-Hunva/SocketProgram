@@ -25,7 +25,7 @@ void recvMsg(char buf[],int sockfd){
         memset(buf,0,sizeof(buf));
         int bytesRecv = recv(sockfd,buf,4096,0);
         if(bytesRecv >0){
-            std::cout << "SERVER> " << std::string(buf,0,bytesRecv) << std::endl;
+            std::cout << "> " << std::string(buf,0,bytesRecv) << std::endl;
         }
     }
 }

@@ -14,12 +14,32 @@
 #include <signal.h>
 #include <unistd.h>
 #include <string>
-#include <cstring>
 #include <map>
+#include <thread>
+#include <pthread.h>
+#include <sys/fcntl.h>
+#include <vector>
+#include <netinet/tcp.h>
+#include <queue>
 #define BACKLOG 10
+#define MAX_CLIENT 10
 
+
+//-----struct Modify------------------------------------------------------------
+//struct msgType{
+//    int time;
+//    char *msg;
+//    msgType *next;
+//};
+//-----struct Modify------------------------------------------------------------
+struct clientNode{
+    char *name;
+    bool status;
+    int socketfd;
+    std:: queue <std::string> msg;
+    int id;
+};
 //-----Class Modify------------------------------------------------------------
-
 class ServerChat
 {
 public:
@@ -31,6 +51,11 @@ public:
     bool listenSocket(int sock, int backLog);
     void *get_in_addr(struct sockaddr *sa);
     void cleanUp();
+
+    //std::vector<clientNode> client();
+
+
+
 private:
     fd_set master; //master file decriptor list
     fd_set read_fds; //temp file descritopr list for select
