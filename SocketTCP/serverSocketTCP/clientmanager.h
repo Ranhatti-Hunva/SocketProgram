@@ -31,11 +31,11 @@ public:
 
     int set_user_name(int fd_num, const char* user_name);
 
-    int get_by_fd(int fd_num, client_information& contain_information);
+    client_information* get_by_fd(int fd_num);
 
     int delete_fs_num(int fd_num);
 
-    int get_by_order(unsigned long order,  client_information& contain_information);
+    client_information* get_by_order(unsigned long order);
 
     int get_fd_by_user_name(const char* user_name);
 

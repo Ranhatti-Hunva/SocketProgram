@@ -87,16 +87,17 @@ char TCPhelper::packed_msg(std::string& msg){
 
 bool TCPhelper::send_msg(int fd, std::string msg, bool& is_rps)
 {
+    // Packed and attack the ID for msg. ID is a char.
     char ID_message = this->packed_msg(msg);
 
-    char send_buffer[bufsize];
-    memset(&send_buffer, 0, bufsize);
+    const unsigned long length_msg = msg.length()+1;
+    char send_buffer[length_msg];
+    memset(&send_buffer, 0, length_msg);
 
-    // What happend if msg is longer than send_buffer.
     strcpy(send_buffer, msg.c_str());
 
+    // Put all message to buffer.
     fd_set send_fds;
-    FD_ZERO(&send_fds);
 
     unsigned long total_bytes, byte_left, sended_bytes;
     total_bytes = msg.length();
@@ -119,22 +120,25 @@ bool TCPhelper::send_msg(int fd, std::string msg, bool& is_rps)
             long status = send(fd, send_buffer+sended_bytes, byte_left, 0);
             if (status < 0)
             {
-                printf("=> Sending failure !!!");
-                if (try_times++ < 3)
+                // Undefined error on send().
+                if (try_times++ > 3)
                 {
+                    printf("=> Sending failure !!!");
                     return false;
                 };
             }
             else
             {
+                // Send a part of message.
                 sended_bytes += static_cast<unsigned long>(status);
                 byte_left -= static_cast<unsigned long>(status);
             };
         }
         else
         {
+            // Timeout when socket buffer is full.
             printf("=> Socket is not ready to send data!! \n");
-            if (try_times++ < 3)
+            if (try_times++ > 3)
             {
                 printf("=> Error on sending message");
                 return false;
@@ -284,9 +288,8 @@ int TCPserver::reciver(int server_fd, client_list& client_socket_list, msg_queue
     {
         if(FD_ISSET(this->client_fds[i], &read_fds))
         {
-            char recv_buffer[bufsize];
-            memset(&recv_buffer,0,bufsize/sizeof(char));
-            long status;
+            char recv_buffer[bufsize] = {0};
+            long status = 0;
 
             if ((status=recv(client_fds[i], recv_buffer, bufsize,0)) <=0)
             {
@@ -310,31 +313,32 @@ int TCPserver::reciver(int server_fd, client_list& client_socket_list, msg_queue
             }
             else
             {
-                client_information host_msg;
-                client_socket_list.get_by_fd(client_fds[i],host_msg);
+                client_information* host_msg;
+                host_msg = client_socket_list.get_by_fd(client_fds[i]);
 
-                bool is_msg_usable = this->unpacked_msg(recv_buffer, host_msg.msg_incompleted, host_msg.ID_msg_incompleted);
+                bool is_msg_usable = this->unpacked_msg(recv_buffer, host_msg->msg_incompleted, host_msg->ID_msg_incompleted);
+
                 if (is_msg_usable)
                 {                    
-                    if (host_msg.msg_incompleted.substr(0,3).compare("RSP"))
+                    if (host_msg->msg_incompleted.substr(0,3).compare("RSP"))
                     {
-                        std::cout << "Message "<<(int) host_msg.ID_msg_incompleted <<" from client on socket " << client_fds[i] << ":" << host_msg.msg_incompleted <<std::endl;
+                        std::cout << "Message "<<(int) host_msg->ID_msg_incompleted <<" from client on socket " << client_fds[i] << ":" << host_msg->msg_incompleted <<std::endl;
 
                         std::string RSP = "RSP";
-                        std::string msg = RSP + host_msg.ID_msg_incompleted + "/";
+                        std::string msg = RSP + host_msg->ID_msg_incompleted + "/";
                         msg_wts.push_respond(msg+std::to_string(client_fds[i]));
-                        printf("=> Have sent RPS for message %d for socket %d \n", host_msg.ID_msg_incompleted, client_fds[i]);
+                        printf("=> Have sent RPS for message %d for socket %d \n", host_msg->ID_msg_incompleted, client_fds[i]);
 
-                        if(host_msg.msg_incompleted.compare("PING"))
+                        if(host_msg->msg_incompleted.compare("PING"))
                         {
-                            process_on_buffer_recv(host_msg.msg_incompleted.c_str(), client_socket_list, client_fds[i], msg_wts);
+                            process_on_buffer_recv(host_msg->msg_incompleted.c_str(), client_socket_list, client_fds[i], msg_wts);
                         };
                     }
                     else
                     {
                         // Delete key message timeout.
-                        this->msg_confirm(host_msg.msg_incompleted);
-                        printf("=> Get RPS for message %d for socket %d \n", host_msg.msg_incompleted[3], client_fds[i]);
+                        this->msg_confirm(host_msg->msg_incompleted);
+                        printf("=> Get RPS for message %d for socket %d \n", host_msg->msg_incompleted[3], client_fds[i]);
                     };
                 };
             };

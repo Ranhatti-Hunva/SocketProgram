@@ -28,7 +28,7 @@ protected:
 
     struct timeval general_tv;
 
-    static const unsigned int bufsize = 256;
+    static const unsigned int bufsize = 20;
 
     static const int timeout = 1;
 

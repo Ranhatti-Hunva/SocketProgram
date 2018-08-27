@@ -19,7 +19,6 @@ void send_TCP(msg_queue& msg_wts, client_list& client_socket_list, TCPserver& se
 {
     std::vector<std::string> container;
     int socket_for_client;
-    client_information client_socket_information;
 
     while(!end_connection)
     {
@@ -61,7 +60,6 @@ void send_TCP(msg_queue& msg_wts, client_list& client_socket_list, TCPserver& se
 
         if (!msg.empty())
         {
-
             if (!msg.compare("#"))
             {
                 // Exit thread because of the wish of user.
@@ -89,10 +87,11 @@ void send_TCP(msg_queue& msg_wts, client_list& client_socket_list, TCPserver& se
 
                     if (isNumber)
                     {
-                        // Searching client.
-                        if(client_socket_list.get_by_fd(socket_for_client, client_socket_information) < 0)
+                        // Searching client.;
+                        client_information* client_socket_information = client_socket_list.get_by_fd(socket_for_client);
+                        if(client_socket_information == nullptr)
                         {
-                            printf("=>Don't have this socket in the list \n");
+                            printf("=> Don't have this socket in the list \n");
                         }
                         else
                         {
@@ -132,7 +131,6 @@ void process_on_buffer_recv(const char* buffer, client_list& client_socket_list,
     std::string bufstr = buffer;
     std::vector<std::string> container;
 
-
     if (bufstr.compare("#"))
     {
         splits_string(bufstr, container);
@@ -155,7 +153,6 @@ void process_on_buffer_recv(const char* buffer, client_list& client_socket_list,
                     if (!read_file.fail())
                     {
                         std::string msg;
-                        // std::stack<std::string> msg_lock_in;
 
                         int forward_fd = client_socket_list.get_fd_by_user_name(container[1].c_str());
                         forward_fd = client_socket_list.is_online(forward_fd);
@@ -199,20 +196,20 @@ void process_on_buffer_recv(const char* buffer, client_list& client_socket_list,
                     std::string nameof = "../build-serverSocketTCP-Desktop_Qt_5_11_1_clang_64bit-Debug/clientmsg/"+container[1]+".txt";
                     write_file.open(nameof, std::fstream::app);
 
-                    client_information host_msg;
-                    client_socket_list.get_by_fd(client_fd, host_msg);
-                    std::string str(host_msg.user_name);
+                    client_information* host_msg;
+                    host_msg = client_socket_list.get_by_fd(client_fd);
+                    std::string str(host_msg->user_name);
 
-                    write_file <<  str+"=>"+container[0]  << std::endl;
+                    write_file << str+"=>"+container[0]<< std::endl;
 
                     write_file.close();
                 }
                 else
                 {
-                    client_information host_msg;
-                    client_socket_list.get_by_fd(client_fd, host_msg);
+                    client_information* host_msg;
+                    host_msg = client_socket_list.get_by_fd(client_fd);
 
-                    std::string str(host_msg.user_name);
+                    std::string str(host_msg->user_name);
                     message = str+"=>"+container[0]+"/"+std::to_string(forward_fd);
                 };
                 // Push msg to msg waiting queue.
@@ -220,9 +217,9 @@ void process_on_buffer_recv(const char* buffer, client_list& client_socket_list,
             }
             else
             {
-                client_information host_msg;
-                client_socket_list.get_by_fd(client_fd, host_msg);
-                std::string str(host_msg.user_name);
+                client_information* host_msg;
+                host_msg = client_socket_list.get_by_fd(client_fd);
+                std::string str(host_msg->user_name);
 
                 std::string head_msg;
                 head_msg = str+"=>"+container[0]+"/";
@@ -231,15 +228,15 @@ void process_on_buffer_recv(const char* buffer, client_list& client_socket_list,
                 for (unsigned long i=0; i< num_client; i++)
                 {
                     std::string message;
-                    client_information forward_msg;
-                    client_socket_list.get_by_order(i,forward_msg);
+                    client_information* forward_msg;
+                    forward_msg = client_socket_list.get_by_order(i);
 
-                    client_information host_msg;
-                    client_socket_list.get_by_fd(client_fd, host_msg);
+                    client_information* host_msg;
+                    host_msg = client_socket_list.get_by_fd(client_fd);
 
-                    if ((forward_msg.is_online) && (strcmp(forward_msg.user_name, host_msg.user_name)))
+                    if ((forward_msg->is_online) && (strcmp(forward_msg->user_name, host_msg->user_name)))
                     {
-                        message = head_msg + std::to_string(forward_msg.num_socket);
+                        message = head_msg + std::to_string(forward_msg->num_socket);
                         msg_wts.push_msg(message);
                         message.clear();
                     };

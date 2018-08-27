@@ -24,6 +24,7 @@ void send_TCP(msg_queue& msg_wts, TCPclient& client_helper, int& socket_fd, bool
         if (FD_ISSET(0, &reader))
         {
             getline(std::cin, user_cmd_str);
+
             if(!user_cmd_str.empty())
             {
                 msg_wts.push_msg(user_cmd_str);
@@ -105,7 +106,7 @@ int is_reconnect(int& client_fd)
     {
         close(client_fd);
         printf("=> Do you want reconnect to server (Y/N)?\n");
-        getline(std::cin, answer);        
+        getline(std::cin, answer);
 
         if(!answer.compare("Y"))
         {

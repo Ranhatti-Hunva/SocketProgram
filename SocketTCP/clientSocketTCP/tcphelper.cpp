@@ -94,11 +94,11 @@ bool TCPhelper::send_msg(int fd, std::string msg, std::vector<rps_timeout>& rps_
     // Packed and attack the ID for msg. ID is a char.
     char ID_message = this->packed_msg(msg);
 
-    char send_buffer[bufsize] = {0};
+    const unsigned long length_msg = msg.length()+1;
+    char send_buffer[length_msg];
+    memset(&send_buffer, 0, length_msg);
 
-    // What happend if msg is longer than bufsize??
     strcpy(send_buffer, msg.c_str());
-
 
     // Put all message to buffer.
     fd_set send_fds;
@@ -268,11 +268,10 @@ int TCPclient::recv_msg(int client_fd)
     };
 
     long num_byte;
-    char recv_buf[bufsize] = {0};
 
     if (FD_ISSET(client_fd, &read_fds))
     {
-        memset(&recv_buf,0,bufsize);
+        char recv_buf[bufsize] = {0};
         if ((num_byte = recv(client_fd,recv_buf,bufsize,0)) <=0 )
         {
             if ((num_byte == -1) && ((errno == EAGAIN)|| (errno == EWOULDBLOCK)))
@@ -299,6 +298,8 @@ int TCPclient::recv_msg(int client_fd)
         else
         {
             bool is_msg_usable = this->unpacked_msg(recv_buf, msg_incomplete, ID_msg_incomplete);
+//            std::cout << "=> MSG_incomplete:" << msg_incomplete << ". ID msg: "<< (int)ID_msg_incomplete << std::endl;
+
             return (is_msg_usable)?1:0;
         };
     }

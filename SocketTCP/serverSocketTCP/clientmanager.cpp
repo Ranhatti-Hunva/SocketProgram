@@ -40,31 +40,29 @@ int client_list::set_user_name(int fd_num, const char* user_name)
     return -1;
 };
 
-int client_list::get_by_fd(int fd_num, client_information& contain_information)
+client_information* client_list::get_by_fd(int fd_num)
 {
     std::lock_guard<std::mutex> guard(client_mutext);
     for (unsigned long i=0; i< client_list.size(); i++)
     {
         if (client_list[i].num_socket == fd_num)
-        {
-            contain_information = client_list[i];
-            return 0;
+        { 
+            return &client_list[i];
         };
     };
-    return -1;
+    return nullptr;
 };
 
-int client_list::get_by_order(unsigned long order,  client_information& contain_information)
+client_information* client_list::get_by_order(unsigned long order)
 {
     std::lock_guard<std::mutex> guard(client_mutext);
     if (order<client_list.size())
-    {
-        contain_information =  client_list[order];
-        return 0;
+    { 
+        return &client_list[order];
     }
     else
     {
-        return -1;
+        return nullptr;
     }
 };
 
@@ -117,10 +115,11 @@ int client_list::get_fd_by_user_name(const char* user_name)
 
 int client_list::is_online(int fd_num){
 
-    client_information client;
-    if(get_by_fd(fd_num, client) == 0)
+    client_information* client;
+    client = get_by_fd(fd_num);
+    if(client != nullptr)
     {
-        if (client.is_online){
+        if (client->is_online){
             return fd_num;
         }
         else
@@ -135,10 +134,11 @@ int client_list::is_online(int fd_num){
 };
 
 void client_list::off_client(int fd_num){
-    client_information client;
-    if(get_by_fd(fd_num, client) == 0)
+    client_information* client;
+    client = get_by_fd(fd_num);
+    if(client != nullptr)
     {
-        client.is_online = false;
+        client->is_online = false;
     }
 };
 
