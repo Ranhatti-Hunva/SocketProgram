@@ -14,10 +14,13 @@ ServerChat::~ServerChat(){
 //---Client thread proccess----------------------------------------------------
 void handleClient(clientNode &cli,std::vector <clientNode> &cliArr){
     char *msg = new char[4096];
+    //std::mutex mutex_ex;
+    //std::lock_guard<std::mutex> guard(client_mutext);
     while(1){
 
         int recvNum = recv(cli.socketfd,msg,4096,0);
         if(recvNum >0){
+            //std::unique_lock<std::mutex> locker(mutex_ex);
             if(cli.name == ""){
                 //slipt
                 for(int i = 0; i <= MAX_CLIENT; i++){
@@ -30,22 +33,11 @@ void handleClient(clientNode &cli,std::vector <clientNode> &cliArr){
                     }
                 }
 
-                //                cliArr
-                //                strcpy(cli.name,msg);
-                //                std::cout << std::string(cli.name,0,strlen(cli.name))<<"\n";
             }
             else{
                 //std::cout << std::string(cli.name,0,strlen(cli.name))<<" chuoi\n";
                 char bufsend[4096];
                 memset(bufsend,0,4096);
-
-
-                //                char input[100] = "A bird came down the walk";
-                //                char *token = std::strtok(input, " ");
-                //                while (token != NULL) {
-                //                    std::cout << token << '\n';
-                //                    token = std::strtok(NULL, " ");
-                //                }
 
                 char *toClient = std::strtok(msg,"/");
 
@@ -58,9 +50,6 @@ void handleClient(clientNode &cli,std::vector <clientNode> &cliArr){
                     for(int i = 0; i <= MAX_CLIENT; i++){
                         // if client valid -> send
                         if(cliArr[i].status == true){
-                            //std::cout << i <<"\n";
-                            //std::cout << cli.socketfd<<" ski\n" ;
-                            //std::cout << cliArr[i].socketfd <<" sk\n" ;
 
                             if(cliArr[i].socketfd != cli.socketfd){
                                 int numSend = send(cliArr[i].socketfd,bufsend,strlen(bufsend),0);
@@ -68,10 +57,22 @@ void handleClient(clientNode &cli,std::vector <clientNode> &cliArr){
                         }
                     }
                 }
+                else if(strcmp(toClient,"exit")==0){
+                    for(int i = 0; i <= MAX_CLIENT; i++){
+                        if(cliArr[i].status == true && cliArr[i].socketfd == cli.socketfd){
+                            close(cli.socketfd);
+                            cliArr[i].status = false;
+                            std::cout << "close the socket " <<cli.socketfd<<"\n";
+                            //exit(1);
+                        }
+                    }
+
+                }
                 else{
                     bool flag = false;
-                    for(int i = 0; i <= MAX_CLIENT; i++){
 
+                    for(int i = 0; i <= MAX_CLIENT; i++){
+                        //std::cout << std::string(cliArr[i].name,0,strlen(cliArr[i].name))<<" "<<cliArr[i].status<<" client\n";
                         if(cliArr[i].status == true
                                 && (strcmp(toClient,cliArr[i].name)==0)){
                             toClient = std::strtok(nullptr, "/");
@@ -80,11 +81,23 @@ void handleClient(clientNode &cli,std::vector <clientNode> &cliArr){
                             strcat(bufsend,toClient);
                             if(cliArr[i].socketfd != cli.socketfd){
                                 int numSend = send(cliArr[i].socketfd,bufsend,strlen(bufsend),0);
+                                std::cout << " send success\n" ;
+                                flag = true;
+                            } else{
+                                std::cout << " msg send itself\n" ;
                                 flag = true;
                             }
                         }
+                        else{
+                            std::cout << std::string(cliArr[i].name,0,strlen(cliArr[i].name))<<" "<<cliArr[i].status<<" client\n";
+                        }
+
                     }
+
+
                     if(!flag){
+                        char * noitce = "client is not exist or format is wrong please try again\n";
+                        int numSend = send(cli.socketfd,noitce,strlen(noitce),0);
                         std::cout << " client is not exist\n" ;
                     }
                 }
@@ -96,6 +109,7 @@ void handleClient(clientNode &cli,std::vector <clientNode> &cliArr){
         else if(recvNum == 0){
             std::cout << "close the socket " <<cli.socketfd<<"\n";
             close(cli.socketfd);
+            //exit(1);
         }
 
     }
@@ -173,135 +187,163 @@ bool ServerChat::listenSocket(int sock, int backLog){
 //    int id;
 //};
 void ServerChat::mainLoop(){
+
+
+
+    //    std::vector<clientNode> client(20);
+    //    std::thread clientThread[20];
+    //    for(int i = 0 ; i < MAX_CLIENT ; i++){
+    //        //        client.push_back(clientNode("",false,-1,nullptr,i));
+    //        client[i].name = "";
+    //        client[i].status = false;
+    //        client[i].socketfd = -1;
+    //        //client[i].msg = nullptr;
+    //        client[i].id = -1;
+    //    }
+    //    int num_client;
+    //    int temp_id;
+    //    fcntl(sockfd, F_SETFL, O_NONBLOCK);
+    //    while(1){
+    //        int newClient = -1;
+    //        newClient = accept(sockfd,(struct sockaddr *)&remoteaddr,&addrlen);
+    //        if(newClient == -1) continue;
+    //        num_client = -1;
+    //        temp_id = -1;
+    //        int k = 0;
+
+    //        for(int i = 0; i < MAX_CLIENT ; i++){
+    //            //if( i == sockfd) continue;
+    //            if( client[i].status == false && client[i].id == -1){
+    //                //std::cout <<  k++ <<"\n";
+    //                client[i].status = true;
+    //                client[i].socketfd = newClient;
+    //                client[i].id = i;
+    //                temp_id = i;
+    //                break;
+    //            }
+    //        }
+
+    //        if(temp_id != -1){
+    //            send(client[temp_id].socketfd, "ack", 4, 0);
+    //            std::cout << "Client #" << client[temp_id].id << " Accepted" << std::endl;
+    //            clientThread[temp_id] = std::thread(handleClient,std::ref(client[temp_id]),std::ref(client));
+    //        }
+    //    }
+
+
+
+    FD_ZERO(&listener);
+    FD_ZERO(&read_fds);
+    FD_SET(sockfd, &listener);
+
+
+    fdmax = sockfd;
+    int flag = 0;
+    int clientOnline = 0;
+    std::map<int,char*> clientSock;
+    fcntl(sockfd, F_SETFL, O_NONBLOCK);
+
+    // tao list client
     std::vector<clientNode> client(20);
-    std::thread clientThread[20];
     for(int i = 0 ; i < MAX_CLIENT ; i++){
-        //        client.push_back(clientNode("",false,-1,nullptr,i));
         client[i].name = "";
         client[i].status = false;
         client[i].socketfd = -1;
-        //client[i].msg = nullptr;
         client[i].id = -1;
     }
-    int num_client;
-    int temp_id;
-    fcntl(sockfd, F_SETFL, O_NONBLOCK);
+    clientNode clientTemp[1];
+    int clientSocket = -1;
     while(1){
-        int newClient = -1;
-        newClient = accept(sockfd,(struct sockaddr *)&remoteaddr,&addrlen);
-        if(newClient == -1) continue;
-        num_client = -1;
-        temp_id = -1;
-        int k = 0;
+        read_fds = listener;
+        if(select(fdmax+1,&read_fds, nullptr,nullptr,nullptr) == -1){
+            perror("select");
+            exit(1);
+        }
+        for(int i = 0; i<= fdmax; i++){
+            if(FD_ISSET(i,&read_fds)){
+                //server listening connection
+                if(i == sockfd){
+                    addrlen = sizeof remoteaddr;
+                    newfd = accept(sockfd,(struct sockaddr *)&remoteaddr,&addrlen);
+                    if(newfd == -1){
+                        perror("accept");
+                    } else {
+                        clientOnline++;
+                        flag = 1;
+                        FD_SET(newfd,&listener);
+                        // assign fdmax = socket of newfd
+                        if( newfd > fdmax){
+                            fdmax = newfd;
+                        }
+                        const char * network_name = inet_ntop(remoteaddr.ss_family,
+                                                              get_in_addr((struct sockaddr*)&remoteaddr)
+                                                              ,remoteIP,INET6_ADDRSTRLEN);
+                        std::cout <<"new connection from" << network_name <<
+                                    " on socket" << newfd << "\n";
 
-        for(int i = 0; i < MAX_CLIENT ; i++){
-            //if( i == sockfd) continue;
-            if( client[i].status == false && client[i].id == -1){
-                //std::cout <<  k++ <<"\n";
-                client[i].status = true;
-                client[i].socketfd = newClient;
-                client[i].id = i;
-                temp_id = i;
-                break;
+                        clientSocket = newfd;
+                    }
+                } else {
+                    // handling data from client
+                    // khong nhan duoc data tu clien -> dong ket noi client
+
+                    if((nbytes = recv(i,buf,sizeof(buf),0))<=0){
+                        if(nbytes == 0){
+                            // close connect
+                            // chuyen trang thai stt sang offline
+
+                            std::cout << "socket "<< i << " closed\n";
+                        } else {
+                            perror("revc");
+                        }
+                        close(i);
+                        FD_CLR(i,&listener);
+                    }
+
+                    //nhan duoc data -> xu li data
+                    else {
+                        //std::cout<<sizeof(buf)<<std::endl;
+
+                        // add data vao Qrecv
+                        /* tach data thanh cac truong length - id destination - data
+                            check client online -> xu li du lieu
+                            offline -> luu vao array client
+                        */
+
+                        // xuli du lieu
+                        /* lay name client -> gan vao data -> dia chi dich
+                           -> chuyen qua Qsend
+                        */
+
+                        // add data vao Qsend
+                        /* tach data = data + dia chi dich
+                           xac dinh dia chi dich
+                           truyen tung nguoi hoac truyen tat ca
+                           send -> deQmsg
+                        */
+
+                        // truyen tung nguoi
+
+                        // truyen tat ca
+                        std::ostringstream  number_str;
+
+                        number_str << i;
+
+                        //strcat(buf,(number_str.str()).c_str());
+                        //qRecv.push(buf);
+
+                        std::cout << "buffer: "<< sizeof(buf) <<" - " << nbytes <<std::endl;
+                        for(unsigned int i=0; i<nbytes; i++)
+                        {
+                            std::cout << (int)buf[i] << " ";
+                        }
+                        std::cout<<"hello ----- "<< std::string(buf,0,strlen(buf)) <<"\n";
+                        memset(buf,0,sizeof(buf));
+                    }
+                }
             }
         }
-
-        if(temp_id != -1){
-            send(client[temp_id].socketfd, "ack", 4, 0);
-            std::cout << "Client #" << client[temp_id].id << " Accepted" << std::endl;
-            clientThread[temp_id] = std::thread(handleClient,std::ref(client[temp_id]),std::ref(client));
-        }
-    }
-
-
-
-    //    FD_ZERO(&master);
-    //    FD_ZERO(&read_fds);
-    //    FD_SET(sockfd, &master);
-    //    fdmax = sockfd;
-    //    int flag = 0;
-    //    int clientOnline = 0;
-    //    std::map<int,char*> clientSock;
-    //    while(1){
-    //        read_fds = master;
-    //        if(select(fdmax+1,&read_fds, nullptr,nullptr,nullptr) == -1){
-    //            perror("select");
-    //            exit(1);
-    //        }
-    //        for(int i = 0; i<= fdmax; i++){
-    //            if(FD_ISSET(i,&read_fds)){
-    //                //server listening connection
-    //                if(i == sockfd){
-    //                    addrlen = sizeof remoteaddr;
-    //                    newfd = accept(sockfd,(struct sockaddr *)&remoteaddr,&addrlen);
-    //                    if(newfd == -1){
-    //                        perror("accept");
-    //                    } else {
-    //                        clientOnline++;
-    //                        flag = 1;
-    //                        FD_SET(newfd,&master);
-    //                        // assign fdmax = socket of newfd
-    //                        if( newfd > fdmax){
-    //                            fdmax = newfd;
-    //                        }
-    //                        const char * network_name = inet_ntop(remoteaddr.ss_family,
-    //                                                              get_in_addr((struct sockaddr*)&remoteaddr)
-    //                                                              ,remoteIP,INET6_ADDRSTRLEN);
-    //                        std::cout <<"new connection from" << network_name <<
-    //                                    " on socket" << newfd << "\n";
-    //                    }
-    //                } else {
-    //                    // handling data from client
-    //                    if(flag == 1){
-    //                        int numRecv = recv(i,buf,sizeof(buf),0);
-    //                        if(numRecv > 0){
-    //                            std::cout <<"client " << std::string(buf,0,numRecv) <<
-    //                                        " online\n";
-    //                            clientSock[i] = buf;
-    //                            send(i,"ACK",4,0);
-    //                        }
-    //                        flag = 0;
-    //                        // break;
-    //                    }
-    //                    else{
-    //                        if((nbytes = recv(i,buf,sizeof(buf),0))<=0){
-    //                            if(nbytes == 0){
-    //                                // close connect
-    //                                std::cout << "socket "<< i << " closed\n";
-    //                            } else {
-    //                                perror("revc");
-    //                            }
-    //                            close(i);
-    //                            FD_CLR(i,&master);
-    //                        } else {
-
-    //                            //std::cout<<sizeof(buf)<<std::endl;
-    //                            for(int j = 0; j <= fdmax; j++){
-    //                                if (FD_ISSET(j, &master)){
-    //                                    if(j!= sockfd && j != i){
-
-    //                                        std:: cout << j <<" ooooOOOoooo"<< std::endl;
-    ////                                        std::cout<< nbytes << std::endl;
-    ////                                        char bufsend[4096];
-    ////                                        strcpy(bufsend,clientSock[i]);
-    ////                                        strcat(bufsend," :");
-    ////                                        nbytes += strlen(clientSock[i]);
-    ////                                        strcat(bufsend,buf);
-    //                                        int sendsuccess = send(j,buf,nbytes,0);
-    //                                        if( sendsuccess == -1){
-    //                                            perror("send");
-    //                                        }
-    //                                    }
-    //                                }
-    //                            }
-    //                            memset(buf,0,sizeof(buf));
-    //                        }
-    //                    }
-
-    //                }
-    //            }
-    //        }
-    //    }    // close socket
+    }    // close socket
 
 }
 

@@ -21,9 +21,12 @@
 #include <vector>
 #include <netinet/tcp.h>
 #include <queue>
+#include <mutex>
+#include <sstream>
+
 #define BACKLOG 10
 #define MAX_CLIENT 10
-
+//std::mutex mutex_ex;
 
 //-----struct Modify------------------------------------------------------------
 //struct msgType{
@@ -42,6 +45,9 @@ struct clientNode{
 //-----Class Modify------------------------------------------------------------
 class ServerChat
 {
+    //std::mutex client_mutext;
+protected:
+
 public:
     ServerChat(char* ipAddress, char* port);
     ~ServerChat();
@@ -57,17 +63,24 @@ public:
 
 
 private:
-    fd_set master; //master file decriptor list
+
+    fd_set listener; //listener file decriptor list
     fd_set read_fds; //temp file descritopr list for select
     int sockfd,fdmax, newfd; // sockfd socket file descriptor, listening onl sockfd
     // max number of connection on fdmax
     // new file descritor
+
+    std:: queue <std::string> qRecv;
+    std:: queue <std::string> qSend;
+
     struct addrinfo hints, *servinfo, *p;
     struct sockaddr_storage remoteaddr; // client address
     socklen_t addrlen;
     struct sigaction sa;
     int yes = 1;
     char s[INET6_ADDRSTRLEN];
+
+
     int rv;
 
     char* m_ipAddr;

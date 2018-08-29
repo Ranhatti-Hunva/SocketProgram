@@ -5,7 +5,9 @@ CONFIG -= qt
 
 SOURCES += \
         main.cpp \
-    serverchat.cpp
+    serverchat.cpp \
+    clientmanage.cpp
 
 HEADERS += \
-    serverchat.h
+    serverchat.h \
+    clientmanage.h
