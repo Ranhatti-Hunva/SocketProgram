@@ -15,6 +15,7 @@
 #include <vector>
 #include <fcntl.h>
 
+#include "threadpool.h"
 #include "clientmanager.h"
 #include "iosocket.h"
 #include "msgqueue.h"
@@ -22,29 +23,9 @@
 
 using namespace std;
 
-class  scoped_thread
-{
-    std::thread t;
-public:
-    explicit scoped_thread(std::thread t_):t(std::move(t_))
-    {
-        if (!t.joinable())
-        {
-            throw std::logic_error("No thread");
-        }
-    }
-
-    ~scoped_thread()
-    {
-        t.join();
-    }
-    scoped_thread(scoped_thread const&)=delete;
-    scoped_thread& operator = (scoped_thread const&) = delete;
-};
-
 int main()
 {
-    // Create server echo socket on port 1500
+    // Create server echo socket on port 1500.
     TCPserver server_helper;
     int server_fd = server_helper.server_echo(1500);
 
@@ -54,19 +35,28 @@ int main()
 
     // Create a message queue to send for socket.
     msg_queue msg_wts;
-    msg_wts.clear();
+    msg_wts.clear(Q_MSG);
+    msg_wts.clear(Q_RSP);
 
+    // Flage stop server
     bool end_connection = false;
 
-    scoped_thread sendThread(std::thread(send_TCP,ref(msg_wts), ref(client_socket_list),ref(server_helper), ref(end_connection)));
+    // Thread pool
+    thread_pool threads(10);
 
-    scoped_thread timeoutThread(thread(server_helper.timeout_clocker, ref(end_connection), ref(client_socket_list)));
+    threads.enqueue(read_terminal, ref(end_connection), ref(client_socket_list), ref(server_helper), ref(msg_wts));
+    threads.enqueue([&]()
+    {
+        server_helper.send_msg(msg_wts, end_connection, client_socket_list);
+    });
 
     while(!end_connection)
     {
-        server_helper.reciver(server_fd, client_socket_list, msg_wts);
+        server_helper.reciver(server_fd, client_socket_list, msg_wts, threads);
     };
+
     /*------------------------------------------------------------------------------------------------------------*/
+    close(server_fd);
     printf("=> Closed the server socket!! \n");
 }
 

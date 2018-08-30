@@ -18,12 +18,25 @@
 #include <vector>
 #include <fcntl.h>
 
+// Time function, sockets, htons... file stat
+#include <sys/time.h>
+#include <sys/uio.h>
+#include <sys/stat.h>
+
+// File function and bzero
+#include <strings.h>
+#include <future>
+
 #include "msgqueue.h"
 #include "tcphelper.h"
 
 extern std::string user_name;
 
-void send_TCP(msg_queue& msg_wts, TCPclient& client_helper, int& socket_fd, bool& finish);
+void splits_string(const std::string& subject, std::vector<std::string>& container);
+
+void read_terminal(bool& end_connection, TCPclient& client_helper, msg_queue& msg_wts);
+
+void send_TCP(msg_queue& msg_wts, TCPclient& client_helper, int& socket_fd, bool& end_connection);
 
 int is_reconnect(int& client_fd);
 

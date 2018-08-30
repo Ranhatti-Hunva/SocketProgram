@@ -1,5 +1,5 @@
 #include "tcphelper.h"
-
+#include "iosocket.h"
 
 // TCPhelper contructor, menthod, .....
 std::vector<TCPhelper::rps_timeout> TCPhelper::rps_timeout_list;
@@ -72,34 +72,83 @@ bool TCPhelper::unpacked_msg(char* buffer, std::string& msg_incomplete, char& ID
     return false;
 }
 
-char TCPhelper::packed_msg(std::string& msg)
+bool TCPhelper::packed_msg(const msg_text msg_input, std::vector<unsigned char>& element)
 {
-    static char ID = 1;
-    while ((ID==0)||(ID==2)||(ID==3))
+    // Length msg
+    unsigned long len = msg_input.msg.length()+9;
+    unsigned char len_byte[4];
+    memcpy(len_byte, &len, 4);
+
+    // ID msg
+    unsigned char ID_byte[4];
+    static unsigned int ID_msg = 1;
+
+    ID_msg = (ID_msg==0)?ID_msg++:ID_msg;
+
+    if (msg_input.type_msg < 3)
     {
-        ID++;
+        memcpy(ID_byte, &ID_msg, 4);
+    }
+    else
+    {
+        if(msg_input.ID == 0)
+        {
+            printf("=> Haven't insert ID of the msg you want to send respond");
+            return false;
+        }
+        else
+        {
+            memcpy(ID_byte, &msg_input.ID, 4);
+        }
     };
 
-    char begin_c = 2;
-    char end_c = 3;
 
-    msg = ID + msg + end_c;
-    msg = begin_c + msg;
-
-    return ID++;
+    for(unsigned int i = 0; i<len; i++)
+    {
+        if (i<4)
+        {
+            element.push_back(len_byte[i]);
+        }
+        else if (i == 4)
+        {
+            element.push_back(msg_input.type_msg);
+        }
+        else if (i<9)
+        {
+            element.push_back(ID_byte[i-5]);
+        }
+        else
+        {
+            if (msg_input.type_msg<2)
+            {
+                element.push_back(static_cast<unsigned char>(msg_input.msg[i-9]));
+            }
+        };
+    };
+    ID_msg++;
+    return true;
 }
 
-bool TCPhelper::send_msg(int fd, std::string msg, std::vector<rps_timeout>& rps_queue_timeout, bool& is_rps)
+bool TCPclient::send_msg(msg_queue& msg_wts, bool& end_connection)
 {
+    msg_text msg_login;
+    msg_login.msg = user_name;
+    msg_login.type_msg = SGI;
+
+    std::vector<unsigned char> element;
+    msg_wts.push(element, Q_MSG)
+
+    while(!end_connection)
+    {
+
+    }
     // Packed and attack the ID for msg. ID is a char.
     char ID_message = this->packed_msg(msg);
 
-    // What happend if msg is longer than bufsize??
     const unsigned long length_msg = msg.length()+1;
     char send_buffer[length_msg];
     memset(&send_buffer, 0, length_msg);
 
-    // char send_buffer[bufsize] = {0};
     strcpy(send_buffer, msg.c_str());
 
     // Put all message to buffer.

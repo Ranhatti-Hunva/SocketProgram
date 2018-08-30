@@ -18,29 +18,10 @@
 #include "msgqueue.h"
 #include "iosocket.h"
 #include "tcphelper.h"
+#include "threadpool.h"
 
 using namespace std;
 string user_name;
-
-// RAII for mutil thread.
-class scoped_thread
-{
-    std::thread t;
-public:
-    explicit scoped_thread(std::thread t_):t(std::move(t_))
-    {
-        if (!t.joinable())
-        {
-            throw std::logic_error("No thread");
-        }
-    }
-    ~scoped_thread()
-    {
-        t.join();
-    }
-    scoped_thread(scoped_thread const&)=delete;
-    scoped_thread& operator = (scoped_thread const&) = delete;
-};
 
 int main()
 {
@@ -70,13 +51,13 @@ int main()
 
         if(!user_name.compare("All"))
         {
-            printf("=> Sorry!! You can use this name. Plz re-insert username:\n");
+            printf("=> Sorry!! You can't use this name. Plz re-insert another username:\n");
         };
     };
 
     // Start program.
-    bool is_finsh = false;
-    while (!is_finsh)
+    bool end_connection = false;
+    while (!end_connection)
     {
         // Connection with timeout to server.
         int client_fd;
@@ -95,43 +76,54 @@ int main()
         printf("\n=> Welcome!! Enter # to end the connection \n\n");
 
         msg_queue msg_wts;      // queue for the massages are wating to send.
-        msg_wts.clear();
+        msg_wts.clear(Q_MSG);
+        msg_wts.clear(Q_RSP);
 
         bool end_connection = false;
 
-        // Start a new thread for sending message
-        scoped_thread sendThread(thread(send_TCP, ref(msg_wts), ref(client_helper), ref(client_fd), ref(end_connection)));
+        // Thread pool
+        thread_pool threads(10);
 
-        //Timout clocker
-        scoped_thread timeoutThread(thread(client_helper.timeout_clocker, ref(end_connection)));
+        threads.enqueue(read_terminal, ref(end_connection), ref(client_helper), ref(msg_wts));
 
-        // Listern incomming message
-        while(!end_connection)
-        {
-            int is_msg_usable = client_helper.recv_msg(client_fd);
-            if (is_msg_usable == -1)
-            {
-                // Socket error or loss conection.
-                end_connection = true;
-            }
-            else if (is_msg_usable == 1)
-            {
-                if (client_helper.msg_incomplete.substr(0,3).compare("RSP")){
-                    cout << "Message "<< static_cast<int>(client_helper.ID_msg_incomplete) <<" from server :" << client_helper.msg_incomplete << endl;
+//        threads.enqueue([&]()
+//        {
+//            client_helper.send_msg(msg_wts, end_connection);
+//        });
 
-                    // Responde to server when get msg.
-                    string RSP = "RSP";
-                    string respond = RSP + client_helper.ID_msg_incomplete;
-                    msg_wts.push_respond(respond);
-                }
-                else
-                {
-                    // Delete key message timeout.
-                    client_helper.msg_confirm(client_helper.msg_incomplete);
-                };
-            };
-        };
-        is_finsh = is_reconnect(client_fd);
+
+//        // Start a new thread for sending message
+//        scoped_thread sendThread(thread(send_TCP, ref(msg_wts), ref(client_helper), ref(client_fd), ref(end_connection)));
+
+//        //Timout clocker
+//        scoped_thread timeoutThread(thread(client_helper.timeout_clocker, ref(end_connection)));
+
+//        // Listern incomming message
+//        while(!end_connection)
+//        {
+//            int is_msg_usable = client_helper.recv_msg(client_fd);
+//            if (is_msg_usable == -1)
+//            {
+//                // Socket error or loss conection.
+//                end_connection = true;
+//            }
+//            else if (is_msg_usable == 1)
+//            {
+//                if (client_helper.msg_incomplete.substr(0,3).compare("RSP")){
+//                    cout << "Message "<< static_cast<int>(client_helper.ID_msg_incomplete) <<" from server :" << client_helper.msg_incomplete << endl;
+//                    // Responde to server when get msg.
+//                    string RSP = "RSP";
+//                    string respond = RSP + client_helper.ID_msg_incomplete;
+//                    msg_wts.push_respond(respond);
+//                }
+//                else
+//                {
+//                    // Delete key message timeout.
+//                    client_helper.msg_confirm(client_helper.msg_incomplete);
+//                };
+//            };
+//        };
+//        end_connection = is_reconnect(client_fd);
     };
 
     /*------------------------------------------------------------------------------------------------------------*/

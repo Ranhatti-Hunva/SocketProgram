@@ -20,6 +20,13 @@
 #include <chrono>
 #include <queue>
 
+#include "msgqueue.h"
+
+#define SGI 0
+#define MSG 1
+#define PIG 2
+#define RSP 3
+
 class TCPhelper
 {    
 protected:
@@ -34,7 +41,7 @@ protected:
 
 public:
     struct rps_timeout{
-        char ID;
+        msg_text msg;
         std::chrono::system_clock::time_point timeout;
         int socket;
     };
@@ -46,13 +53,13 @@ public:
     struct addrinfo* get_addinfo_list(std::string host_name, int port_num);
 
     // Packed msg ad format <2(char)><msg><3(char)> (2 is Start of Text, 3 is End of Text in ASCII).
-    char packed_msg(std::string& msg);
+    bool packed_msg(const msg_text msg_input, std::vector<unsigned char>& element);
 
     // Unpacked msg.
     bool unpacked_msg(char* buffer, std::string& msg_incomplete, char& ID_msg_incomplete);
 
     // Send packed message.
-    bool send_msg(int fd, std::string msg, std::vector<rps_timeout>& rps_queue_timeout, bool& is_rps);
+    //bool send_msg(int fd, std::string msg, std::vector<rps_timeout>& rps_queue_timeout, bool& is_rps);
 
     // Get msg confirm
     void msg_confirm(const std::string rps);
@@ -63,8 +70,8 @@ public:
     std::string msg_incomplete;
     char ID_msg_incomplete;
 
-    static bool ping;
-    static char ping_msg_ID;
+    bool ping;
+    msg_text ping_msg;
 
     TCPclient():TCPhelper()
     {
@@ -83,6 +90,8 @@ public:
     // Return 0 if just got a part of message.
     int recv_msg(int fd);
 
+    // Send packed message.
+    bool send_msg(msg_queue& msg_wts, bool& end_connection);
     // Ping when error in reponds timeout.
     // bool pinger(int fd);
 

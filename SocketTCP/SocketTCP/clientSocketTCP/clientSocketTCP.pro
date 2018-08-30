@@ -18,7 +18,8 @@ SOURCES += \
         main.cpp \
     iosocket.cpp \
     tcphelper.cpp \
-    msgqueue.cpp
+    msgqueue.cpp \
+    udphelper.cpp
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
@@ -28,4 +29,5 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 HEADERS += \
     iosocket.h \
     tcphelper.h \
-    msgqueue.h
+    msgqueue.h \
+    udphelper.h
