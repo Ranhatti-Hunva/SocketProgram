@@ -8,6 +8,11 @@ void recvMsg(char buf[],int sockfd){
         if(bytesRecv >0){
             std::cout << "> " << std::string(buf,0,bytesRecv) << std::endl;
         }
+        if(bytesRecv == 0){
+            std::cout << "> server is close \n";
+            close(sockfd);
+            exit(1);
+        }
     }
 }
 
@@ -16,66 +21,88 @@ int main()
     struct msg_text msgSend;
     msgSend.type_msg = SGI;
     ClientChat client;
-    char buf[1024];
+    unsigned char * buf = new unsigned char [1024];
+    char bufrcv[1024];
+    char statusBuf[10];
     std::string userInput;
     //    std::cout << "IP address: ";
     std::cout << "Your name: ";
     std::string name;
-    //getline(std::cin,name);
-    std::cin >> name;
-    std::cout <<" name la: " <<name << "\n";
+    getline(std::cin,name);
     msgSend.msg.assign(name);
     unsigned char buffer[msgSend.msg.length()+9];
     HandleMsg handleMsg;
 
     handleMsg.packed_msg(msgSend,buffer);
-    //    std::cout << "\n=> Msg: " << msgSend.msg << std::endl;
-    //    std::cout << "=> Buffer in byte (unsigned char): ";
-    //    for(unsigned int i=0; i<msgSend.msg.length()+9; i++)
-    //    {
-    //        std::cout << (int)buffer[i] << " ";
-    //    }
-    //    std::cout << "\n=> ID msg: " << msgSend.ID << std::endl << std::endl;
 
 
     int socket = client.timeoutConnect("localhost","8096",10);
 
 
     if(socket > 0){
-        std::cout << " socket" <<socket<<"\n";
-        std::cout << "bufferbf: "<< std::endl;
-        for(unsigned int i=0; i<msgSend.msg.length()+9; i++)
-        {
-            std::cout << (int)buffer[i] << " ";
-        }
+
         int num = send(socket,buffer,sizeof(buffer),0);
-        std::cout << "buffer: "<<num << std::endl;
-        for(unsigned int i=0; i<msgSend.msg.length()+9; i++)
-        {
-            std::cout << (int)buffer[i] << " ";
+
+
+        while(1){
+            int numRecv = recv(socket,statusBuf,10,0);
+
+            if(strcmp(statusBuf,"success") == 0){
+                std::cout << "Login success\n";
+                std::cout << "Start chat now" <<"\n";
+                std::cout  << "press '#' to exit\n";
+                break;
+            }
+            if(strcmp(statusBuf,"existed") == 0){
+                std::cout << "Username is existed please use another name\n";
+
+                //std::cin.ignore();
+                getline(std::cin,name);
+                msgSend.msg.clear();
+                msgSend.msg.assign(name);
+                unsigned char nameResend[msgSend.msg.length()+9];
+                handleMsg.packed_msg(msgSend,nameResend);
+                send(socket,nameResend,sizeof(nameResend),0);
+            }
+            if(strcmp(statusBuf,"full") == 0){
+                std::cout << "server is full !!! can't login server\n";
+                close(socket);
+                return 1;
+            }
+            memset(statusBuf,0,10);
+            //nhan msg hop le
+
         }
-        int numRecv = recv(socket,buf,sizeof(buf),0);
-        if( numRecv >=0){
-            std::cout << "client connecting to" << client.getServerName() <<"\n";
-            std::cout << "start chat now" <<"\n";
-            //sleep(1);
-        }
+
+
         fcntl(socket, F_SETFL, O_NONBLOCK);
-        std::thread recvThread(recvMsg,buf,socket);
+
+        //struct msg_text msgSend;
+
+        std::thread recvThread(recvMsg,bufrcv,socket);
         while(1){
             std::cout  << ">";
-            std:: cin >> userInput;
-            //getline(std::cin,userInput);
+            //std:: cin >> userInput;
+            getline(std::cin,userInput);
+            if(strcmp(userInput.c_str(),"#") == 0){
+                close(socket);
+                exit(1);
+            }
             if(userInput.size() >0){
-                int sendResult = client.sendall(socket,userInput.c_str(),userInput.size());
+                msgSend.type_msg = MSG;
+                msgSend.msg.assign(userInput);
+                unsigned char bufSend[userInput.size()+9];
+                memset(bufSend,0,userInput.size()+9);
+                handleMsg.packed_msg(msgSend,bufSend);
+                int sendResult = send(socket,bufSend,sizeof(bufSend),0);
                 if(sendResult == -1){
                     perror("send");
                     exit(1);
                 }
             }
-            else{
-                break;
-            }
+//            else if(userInput.size() == 0){
+//                break;
+//            }
         }
     }
 

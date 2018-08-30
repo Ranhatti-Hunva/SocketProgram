@@ -23,6 +23,10 @@
 #include <queue>
 #include <mutex>
 #include <sstream>
+#include "handlemsg.h"
+#include "clientmanage.h"
+#include "clientnode.h"
+#include "threadpool.h"
 
 #define BACKLOG 10
 #define MAX_CLIENT 10
@@ -34,14 +38,7 @@
 //    char *msg;
 //    msgType *next;
 //};
-//-----struct Modify------------------------------------------------------------
-struct clientNode{
-    char *name;
-    bool status;
-    int socketfd;
-    std:: queue <std::string> msg;
-    int id;
-};
+
 //-----Class Modify------------------------------------------------------------
 class ServerChat
 {
@@ -69,9 +66,12 @@ private:
     int sockfd,fdmax, newfd; // sockfd socket file descriptor, listening onl sockfd
     // max number of connection on fdmax
     // new file descritor
+    //std:: queue <struct msg_>  qRecv;
+    ThreadPool pool{10};
 
-    std:: queue <std::string> qRecv;
-    std:: queue <std::string> qSend;
+    std:: queue <struct msg_text> qRecv;
+    std:: queue <struct msg_text> qSend;
+
 
     struct addrinfo hints, *servinfo, *p;
     struct sockaddr_storage remoteaddr; // client address
@@ -80,13 +80,13 @@ private:
     int yes = 1;
     char s[INET6_ADDRSTRLEN];
 
-
+    HandleMsg handlMsg;
     int rv;
 
     char* m_ipAddr;
     char* m_port;
 
-    char buf[4096];    // buffer for client data
+    unsigned char *buf = new unsigned char[4096];    // buffer for client data
     int nbytes;
 
     char remoteIP[INET6_ADDRSTRLEN];

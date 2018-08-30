@@ -168,6 +168,53 @@ bool ServerChat::listenSocket(int sock, int backLog){
     return true;
 }
 //-----------------------------------------------------------------------------
+void clientQRecv(struct msg_text msgHandle, std::vector <clientNode> &clientList){
+    ClientManage cliManage;
+    char *msgbuf = new char(msgHandle.msg.size());
+    strcpy(msgbuf,msgHandle.msg.c_str());
+    std::cout<<"\n msg :"<<msgHandle.msg<<"\n";
+    switch(msgHandle.type_msg){
+    case SGI:
+        cliManage.mapClientWithSocket(clientList,msgHandle.socketfd,msgbuf);
+        for(int i = 0 ; i < MAX_CLIENT ; i++){
+            if(clientList[i].status == true){
+                std::cout<<"name client online "<< std::string(clientList[i].name,0,20) <<" socket "<< clientList[i].socketfd<<"\n";
+            }
+            else if(clientList[i].id!= -1) {
+                std::cout<<"name client offline "<< std::string(clientList[i].name,0,20) <<"\n";
+            }
+        }
+        break;
+    case MSG:
+        cliManage.sendMsgToClient(clientList,msgbuf,msgHandle.socketfd);
+        break;
+    default:
+        break;
+    }
+}
+
+//-----------------------------------------------------------------------------
+void clientQSend(struct msg_text msgHandle, std::vector <clientNode> &clientList){
+//    ClientManage cliManage;
+//    char *msgbuf = new char(msgHandle.msg.size());
+//    strcpy(msgbuf,msgHandle.msg.c_str());
+
+    HandleMsg grapMsg;
+
+
+    switch(msgHandle.type_msg){
+    case RSP:
+        unsigned char buffer[9];
+        grapMsg.packed_msg(msgHandle,buffer);
+        send(msgHandle.socketfd,buffer,9,0);
+        break;
+    default:
+        break;
+    }
+}
+
+
+//-----------------------------------------------------------------------------
 // wait connect
 // close listening socket
 // loop
@@ -239,20 +286,27 @@ void ServerChat::mainLoop(){
 
     fdmax = sockfd;
     int flag = 0;
-    int clientOnline = 0;
-    std::map<int,char*> clientSock;
+//    int clientOnline = 0;
+//    std::map<int,char*> clientSock;
     fcntl(sockfd, F_SETFL, O_NONBLOCK);
 
     // tao list client
-    std::vector<clientNode> client(20);
+    std::vector<clientNode> client(MAX_CLIENT);
     for(int i = 0 ; i < MAX_CLIENT ; i++){
         client[i].name = "";
         client[i].status = false;
         client[i].socketfd = -1;
         client[i].id = -1;
     }
-    clientNode clientTemp[1];
+    //clientNode clientTemp[1];
     int clientSocket = -1;
+
+
+    //std::cout << "number = 5\n";
+
+
+
+
     while(1){
         read_fds = listener;
         if(select(fdmax+1,&read_fds, nullptr,nullptr,nullptr) == -1){
@@ -268,7 +322,7 @@ void ServerChat::mainLoop(){
                     if(newfd == -1){
                         perror("accept");
                     } else {
-                        clientOnline++;
+
                         flag = 1;
                         FD_SET(newfd,&listener);
                         // assign fdmax = socket of newfd
@@ -287,11 +341,16 @@ void ServerChat::mainLoop(){
                     // handling data from client
                     // khong nhan duoc data tu clien -> dong ket noi client
 
-                    if((nbytes = recv(i,buf,sizeof(buf),0))<=0){
+                    if((nbytes = recv(i,buf,4096,0))<=0){
                         if(nbytes == 0){
                             // close connect
                             // chuyen trang thai stt sang offline
-
+                            for(int j = 0 ; j < MAX_CLIENT ; j++){
+                                if(client[j].socketfd == i && client[j].status == true){
+                                    client[j].status = false;
+                                    break;
+                                }
+                            }
                             std::cout << "socket "<< i << " closed\n";
                         } else {
                             perror("revc");
@@ -330,20 +389,53 @@ void ServerChat::mainLoop(){
                         number_str << i;
 
                         //strcat(buf,(number_str.str()).c_str());
-                        //qRecv.push(buf);
+                        struct msg_text recvMsg,rspMsg;
+                        recvMsg.ID = 0;
+                        recvMsg.msg ="";
+                        recvMsg.type_msg = -1;
+                        recvMsg.socketfd = i;
 
-                        std::cout << "buffer: "<< sizeof(buf) <<" - " << nbytes <<std::endl;
-                        for(unsigned int i=0; i<nbytes; i++)
-                        {
-                            std::cout << (int)buf[i] << " ";
-                        }
-                        std::cout<<"hello ----- "<< std::string(buf,0,strlen(buf)) <<"\n";
-                        memset(buf,0,sizeof(buf));
+                        bool is_success = handlMsg.unpacked_msg(recvMsg,buf,nbytes);
+
+                        rspMsg.ID = recvMsg.ID;
+                        rspMsg.type_msg = RSP;
+                        rspMsg.msg = "";
+                        rspMsg.socketfd = i;
+                        qRecv.push(recvMsg);
+                        qSend.push(rspMsg);
+
+//                        std::cout << "=> Type msg 1 : " << (int)qRecv.front().type_msg << std::endl;
+//                        std::cout << "=> ID msg 1 : " << qRecv.front().ID << std::endl;
+//                        std::cout << "=> Msg 1 : " << qRecv.front().msg << std::endl;
+
+
+
+//                        for(unsigned int i=0; i<nbytes; i++)
+//                        {
+//                            std::cout << (int)buf[i] << " ";
+//                        }
+//                        std::cout<<"hello ----- " <<"\n";
+                        memset(buf,0,4096);
                     }
                 }
             }
+        }// end for
+        if(!qRecv.empty()){
+            struct msg_text qMsg;
+            qMsg.ID = qRecv.front().ID;
+            qMsg.msg = qRecv.front().msg;
+            qMsg.type_msg = qRecv.front().type_msg;
+            qMsg.socketfd = qRecv.front().socketfd;
+
+            pool.enqueue([qMsg,&client]{
+                clientQRecv(qMsg,client);
+            });
+            qRecv.pop();
         }
-    }    // close socket
+
+
+
+    }    // end while -close socket
 
 }
 

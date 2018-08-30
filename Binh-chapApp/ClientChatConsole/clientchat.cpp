@@ -174,15 +174,9 @@ int  ClientChat::timeoutConnect(char *host,char* port, int timeout){
             exit(0);
         }
         //        fcntl(sockfd, F_SETFL, O_NONBLOCK);
-        std::cout<<"co vao \n";
-        std::cout<<"sock "<< sockfd <<"\n";
-
-
         int connectStatus = connect(sockfd,p->ai_addr,p->ai_addrlen);
-        std::cout<<"co vao 3 \n";
-        std::cout<<"status " << connectStatus << "\n";
         if (connectStatus < 0) {
-            std::cout<<"co vao 1 \n";
+
             if (errno == EINPROGRESS) {
                 fprintf(stderr, "EINPROGRESS in connect() - selecting\n");
                 do {
@@ -220,7 +214,7 @@ int  ClientChat::timeoutConnect(char *host,char* port, int timeout){
                 exit(0);
             }
         }
-        std::cout<<"co vao 2 \n";
+
         arg = fcntl(sockfd, F_GETFL, NULL);
         arg &= (~O_NONBLOCK);
         fcntl(sockfd, F_SETFL, arg);
