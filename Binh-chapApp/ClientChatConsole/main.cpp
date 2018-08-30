@@ -1,11 +1,15 @@
 #include "clientchat.h"
 #include "handlemsg.h"
 
-void recvMsg(char buf[],int sockfd){
+std::mutex mtx;
+
+void recvMsg(char *buf,int sockfd){
     while(1){
-        memset(buf,0,sizeof(buf));
+        memset(buf,0,1024);
+
         int bytesRecv = recv(sockfd,buf,1024,0);
         if(bytesRecv >0){
+
             std::cout << "> " << std::string(buf,0,bytesRecv) << std::endl;
         }
         if(bytesRecv == 0){
@@ -45,31 +49,36 @@ int main()
 
 
         while(1){
+
             int numRecv = recv(socket,statusBuf,10,0);
+            //mtx.lock();
+            if(numRecv >0){
 
-            if(strcmp(statusBuf,"success") == 0){
-                std::cout << "Login success\n";
-                std::cout << "Start chat now" <<"\n";
-                std::cout  << "press '#' to exit\n";
-                break;
-            }
-            if(strcmp(statusBuf,"existed") == 0){
-                std::cout << "Username is existed please use another name\n";
+                if(strcmp(statusBuf,"success") == 0){
+                    std::cout << "Login success\n";
+                    std::cout << "Start chat now" <<"\n";
+                    std::cout  << "press '#' to exit\n";
+                    break;
+                }
+                if(strcmp(statusBuf,"existed") == 0){
+                    std::cout << "Username is existed please use another name\n";
 
-                //std::cin.ignore();
-                getline(std::cin,name);
-                msgSend.msg.clear();
-                msgSend.msg.assign(name);
-                unsigned char nameResend[msgSend.msg.length()+9];
-                handleMsg.packed_msg(msgSend,nameResend);
-                send(socket,nameResend,sizeof(nameResend),0);
+                    //std::cin.ignore();
+                    getline(std::cin,name);
+                    msgSend.msg.clear();
+                    msgSend.msg.assign(name);
+                    unsigned char nameResend[msgSend.msg.length()+9];
+                    handleMsg.packed_msg(msgSend,nameResend);
+                    send(socket,nameResend,sizeof(nameResend),0);
+                }
+                if(strcmp(statusBuf,"full") == 0){
+                    std::cout << "server is full !!! can't login server\n";
+                    close(socket);
+                    return 1;
+                }
+                memset(statusBuf,0,10);
             }
-            if(strcmp(statusBuf,"full") == 0){
-                std::cout << "server is full !!! can't login server\n";
-                close(socket);
-                return 1;
-            }
-            memset(statusBuf,0,10);
+            //mtx.unlock();
             //nhan msg hop le
 
         }
@@ -85,6 +94,7 @@ int main()
             //std:: cin >> userInput;
             getline(std::cin,userInput);
             if(strcmp(userInput.c_str(),"#") == 0){
+                send(socket,"",0,0);
                 close(socket);
                 exit(1);
             }
@@ -100,9 +110,9 @@ int main()
                     exit(1);
                 }
             }
-//            else if(userInput.size() == 0){
-//                break;
-//            }
+            //            else if(userInput.size() == 0){
+            //                break;
+            //            }
         }
     }
 

@@ -11,109 +11,6 @@ ServerChat::~ServerChat(){
     cleanUp();
 }
 
-//---Client thread proccess----------------------------------------------------
-void handleClient(clientNode &cli,std::vector <clientNode> &cliArr){
-    char *msg = new char[4096];
-    //std::mutex mutex_ex;
-    //std::lock_guard<std::mutex> guard(client_mutext);
-    while(1){
-
-        int recvNum = recv(cli.socketfd,msg,4096,0);
-        if(recvNum >0){
-            //std::unique_lock<std::mutex> locker(mutex_ex);
-            if(cli.name == ""){
-                //slipt
-                for(int i = 0; i <= MAX_CLIENT; i++){
-                    if(cliArr[i].socketfd == cli.socketfd){
-                        //char a[400] ;
-                        //strcpy(a,msg);
-                        cliArr[i].name = new char[20];
-                        strcpy(cliArr[i].name,msg);
-                        std::cout << std::string(cli.name,0,strlen(cli.name))<<"\n";
-                    }
-                }
-
-            }
-            else{
-                //std::cout << std::string(cli.name,0,strlen(cli.name))<<" chuoi\n";
-                char bufsend[4096];
-                memset(bufsend,0,4096);
-
-                char *toClient = std::strtok(msg,"/");
-
-                std::cout << toClient << '\n';
-                if(strcmp(toClient,"all")==0){
-                    toClient = std::strtok(nullptr, "/");
-                    strcat(bufsend,cli.name);
-                    strcat(bufsend,": ");
-                    strcat(bufsend,toClient);
-                    for(int i = 0; i <= MAX_CLIENT; i++){
-                        // if client valid -> send
-                        if(cliArr[i].status == true){
-
-                            if(cliArr[i].socketfd != cli.socketfd){
-                                int numSend = send(cliArr[i].socketfd,bufsend,strlen(bufsend),0);
-                            }
-                        }
-                    }
-                }
-                else if(strcmp(toClient,"exit")==0){
-                    for(int i = 0; i <= MAX_CLIENT; i++){
-                        if(cliArr[i].status == true && cliArr[i].socketfd == cli.socketfd){
-                            close(cli.socketfd);
-                            cliArr[i].status = false;
-                            std::cout << "close the socket " <<cli.socketfd<<"\n";
-                            //exit(1);
-                        }
-                    }
-
-                }
-                else{
-                    bool flag = false;
-
-                    for(int i = 0; i <= MAX_CLIENT; i++){
-                        //std::cout << std::string(cliArr[i].name,0,strlen(cliArr[i].name))<<" "<<cliArr[i].status<<" client\n";
-                        if(cliArr[i].status == true
-                                && (strcmp(toClient,cliArr[i].name)==0)){
-                            toClient = std::strtok(nullptr, "/");
-                            strcat(bufsend,cli.name);
-                            strcat(bufsend,": ");
-                            strcat(bufsend,toClient);
-                            if(cliArr[i].socketfd != cli.socketfd){
-                                int numSend = send(cliArr[i].socketfd,bufsend,strlen(bufsend),0);
-                                std::cout << " send success\n" ;
-                                flag = true;
-                            } else{
-                                std::cout << " msg send itself\n" ;
-                                flag = true;
-                            }
-                        }
-                        else{
-                            std::cout << std::string(cliArr[i].name,0,strlen(cliArr[i].name))<<" "<<cliArr[i].status<<" client\n";
-                        }
-
-                    }
-
-
-                    if(!flag){
-                        char * noitce = "client is not exist or format is wrong please try again\n";
-                        int numSend = send(cli.socketfd,noitce,strlen(noitce),0);
-                        std::cout << " client is not exist\n" ;
-                    }
-                }
-
-
-            }
-            memset(msg,0,4096);
-        }
-        else if(recvNum == 0){
-            std::cout << "close the socket " <<cli.socketfd<<"\n";
-            close(cli.socketfd);
-            //exit(1);
-        }
-
-    }
-}
 //-----------------------------------------------------------------------------
 void ServerChat::initSet(){
     memset(&hints, 0 , sizeof(hints)); // clear memory of hints
@@ -235,50 +132,6 @@ void clientQSend(struct msg_text msgHandle, std::vector <clientNode> &clientList
 //};
 void ServerChat::mainLoop(){
 
-
-
-    //    std::vector<clientNode> client(20);
-    //    std::thread clientThread[20];
-    //    for(int i = 0 ; i < MAX_CLIENT ; i++){
-    //        //        client.push_back(clientNode("",false,-1,nullptr,i));
-    //        client[i].name = "";
-    //        client[i].status = false;
-    //        client[i].socketfd = -1;
-    //        //client[i].msg = nullptr;
-    //        client[i].id = -1;
-    //    }
-    //    int num_client;
-    //    int temp_id;
-    //    fcntl(sockfd, F_SETFL, O_NONBLOCK);
-    //    while(1){
-    //        int newClient = -1;
-    //        newClient = accept(sockfd,(struct sockaddr *)&remoteaddr,&addrlen);
-    //        if(newClient == -1) continue;
-    //        num_client = -1;
-    //        temp_id = -1;
-    //        int k = 0;
-
-    //        for(int i = 0; i < MAX_CLIENT ; i++){
-    //            //if( i == sockfd) continue;
-    //            if( client[i].status == false && client[i].id == -1){
-    //                //std::cout <<  k++ <<"\n";
-    //                client[i].status = true;
-    //                client[i].socketfd = newClient;
-    //                client[i].id = i;
-    //                temp_id = i;
-    //                break;
-    //            }
-    //        }
-
-    //        if(temp_id != -1){
-    //            send(client[temp_id].socketfd, "ack", 4, 0);
-    //            std::cout << "Client #" << client[temp_id].id << " Accepted" << std::endl;
-    //            clientThread[temp_id] = std::thread(handleClient,std::ref(client[temp_id]),std::ref(client));
-    //        }
-    //    }
-
-
-
     FD_ZERO(&listener);
     FD_ZERO(&read_fds);
     FD_SET(sockfd, &listener);
@@ -398,23 +251,15 @@ void ServerChat::mainLoop(){
                         bool is_success = handlMsg.unpacked_msg(recvMsg,buf,nbytes);
 
                         rspMsg.ID = recvMsg.ID;
+
+                        std::cout<<"msg id :"<<recvMsg.ID<<"\n";
+
                         rspMsg.type_msg = RSP;
                         rspMsg.msg = "";
                         rspMsg.socketfd = i;
                         qRecv.push(recvMsg);
                         qSend.push(rspMsg);
 
-//                        std::cout << "=> Type msg 1 : " << (int)qRecv.front().type_msg << std::endl;
-//                        std::cout << "=> ID msg 1 : " << qRecv.front().ID << std::endl;
-//                        std::cout << "=> Msg 1 : " << qRecv.front().msg << std::endl;
-
-
-
-//                        for(unsigned int i=0; i<nbytes; i++)
-//                        {
-//                            std::cout << (int)buf[i] << " ";
-//                        }
-//                        std::cout<<"hello ----- " <<"\n";
                         memset(buf,0,4096);
                     }
                 }

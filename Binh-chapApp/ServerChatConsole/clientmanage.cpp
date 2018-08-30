@@ -26,16 +26,19 @@ void ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,int 
             strcpy(filename,clientList[i].name);
             std::string e;
             infile.open(strcat(filename,".txt"));
-            while(!infile.eof()){
-                char a[1024];
-                infile.getline(a,1024);
-                send(clientList[i].socketfd,a,strlen(a),0);
-                std::cout<<std::string(a,0,250)<<"\n";
+            if(infile.is_open() == true){
+                while(!infile.eof()){
+                    char a[1024];
+                    infile.getline(a,1024);
+                    send(clientList[i].socketfd,a,strlen(a),0);
+                    std::cout<<std::string(a,0,250)<<"\n";
+                }
+                infile.close();
+                std::ofstream ofs;
+                ofs.open(filename, std::ofstream::out | std::ofstream::trunc);
+                ofs.close();
             }
-            infile.close();
-            std::ofstream ofs;
-            ofs.open(filename, std::ofstream::out | std::ofstream::trunc);
-            ofs.close();
+
             //
             //
             //               infile.open("vietjack.dat");
@@ -133,7 +136,7 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,char *ms
         for(int i = 0; i < MAX_CLIENT ; i++){
             if(clientList[i].id != -1 && clientList[i].status == false){
                 std::cout<<std::string(clientList[i].name,0,20)<<" off\n";
-                std::cout<<"str cmp : "<<strcmp(clientList[i].name,nameClientSend)<<"\n";
+                //std::cout<<"str cmp : "<<strcmp(clientList[i].name,nameClientSend)<<"\n";
             }
             if(strcmp(clientList[i].name,nameClientSend) == 0){
                 if(clientList[i].status == true){
