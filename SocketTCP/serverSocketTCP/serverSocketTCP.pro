@@ -32,4 +32,5 @@ HEADERS += \
     clientmanager.h \
     iosocket.h \
     tcphelper.h \
-    msgqueue.h
+    msgqueue.h \
+    threadpool.h

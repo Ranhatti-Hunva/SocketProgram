@@ -1,8 +1,19 @@
 #include "tcphelper.h"
 #include "iosocket.h"
 
-
 // TCPhelper contructor, menthod, .....
+//std::vector<TCPhelper::rps_timeout> TCPhelper::rps_timeout_list;
+
+void ultoc(unsigned int& ul, unsigned char* cu)
+{
+    ul = 0;
+    for (unsigned int i=0; i<4; i++)
+    {
+        unsigned int j = static_cast<unsigned int>(*cu++) << i*8;
+        ul |= j;
+    };
+};
+
 TCPhelper::TCPhelper()
 {
     FD_ZERO(&master);
@@ -41,132 +52,107 @@ struct addrinfo* TCPhelper::get_addinfo_list(std::string host_name, int port_num
     return infor_list;
 };
 
-bool TCPhelper::unpacked_msg(char* buffer, std::string& msg_incomplete, char& ID_msg_incomplete){
-    char* p = buffer;
-    while(*p != 0)
-    {
-        switch (*p)
-        {
-            case 2:
-            {
-                msg_incomplete.clear();
-                p++;
-                ID_msg_incomplete = *p;
-                break;
-            };
-            case 3:
-            {
-                return true;
-            };
-            default:
-            {
-                msg_incomplete = msg_incomplete + *p;
-                break;
-            };
-        };
-        p++;
-    };
-    return false;
-}
-
-char TCPhelper::packed_msg(std::string& msg){
-    static char ID = 1;
-    while ((ID==0)||(ID==2)||(ID==3))
-    {
-        ID++;
-    };
-
-    char begin_c = 2;
-    char end_c = 3;
-
-    msg = ID + msg + end_c;
-    msg = begin_c +  msg;
-
-    return ID++;
-}
-
-bool TCPhelper::send_msg(int fd, std::string msg, bool& is_rps)
+bool TCPhelper::unpacked_msg(msg_text& msg_output, const std::vector<unsigned char> buffer)
 {
-    // Packed and attack the ID for msg. ID is a char.
-    char ID_message = this->packed_msg(msg);
-
-    const unsigned long length_msg = msg.length()+1;
-    char send_buffer[length_msg];
-    memset(&send_buffer, 0, length_msg);
-
-    strcpy(send_buffer, msg.c_str());
-
-    // Put all message to buffer.
-    fd_set send_fds;
-
-    unsigned long total_bytes, byte_left, sended_bytes;
-    total_bytes = msg.length();
-    byte_left = total_bytes;
-    sended_bytes = 0;
-    int try_times = 0;
-
-    while(sended_bytes < total_bytes)
+    if(buffer.size() < 9)
     {
-        FD_ZERO(&send_fds);
-        FD_SET(fd,&send_fds);
-        if (select(fd+1,nullptr, &send_fds, nullptr, &general_tv) <0)
-        {
-            perror("=>Select ");
-            return false;
-        };
+        // Shortest msg has 9 bytes in length.
+        return false;
+    }
+    else
+    {
+        unsigned int len_msg;
+        unsigned char len_msg_c[4] = {buffer[0],buffer[1],buffer[2],buffer[3]};
+        ultoc(len_msg,len_msg_c);
 
-        if(FD_ISSET(fd, &send_fds))
+        if(buffer.size() < len_msg)
         {
-            long status = send(fd, send_buffer+sended_bytes, byte_left, 0);
-            if (status < 0)
-            {
-                // Undefined error on send().
-                if (try_times++ > 3)
-                {
-                    printf("=> Sending failure !!!");
-                    return false;
-                };
-            }
-            else
-            {
-                // Send a part of message.
-                sended_bytes += static_cast<unsigned long>(status);
-                byte_left -= static_cast<unsigned long>(status);
-            };
+            return false;
         }
         else
         {
-            // Timeout when socket buffer is full.
-            printf("=> Socket is not ready to send data!! \n");
-            if (try_times++ > 3)
+            msg_output.type_msg = buffer[4];
+
+            unsigned char ID_msg_c[4] = {buffer[5],buffer[6],buffer[7],buffer[8]};
+            ultoc(msg_output.ID,ID_msg_c);
+
+            if (msg_output.type_msg < 2)
             {
-                printf("=> Error on sending message");
-                return false;
+                msg_output.msg.clear();
+
+                for(unsigned long i=9; i<buffer.size(); i++)
+                {
+                    msg_output.msg = msg_output.msg + static_cast<char>(buffer[i]);
+                };
             };
+            return true;
         };
     };
-
-    // Return ID to queue.
-    if (!is_rps){
-        rps_timeout timepoint;
-        timepoint.ID = ID_message;
-        timepoint.timeout = std::chrono::system_clock::now();
-        timepoint.socket = fd;
-        rps_timeout_list.push_back(timepoint);
-    };
-
-    return true;
 };
 
-std::vector<TCPhelper::rps_timeout> TCPhelper::rps_timeout_list;
-
-void TCPhelper::msg_confirm(const std::string rps)
+bool TCPhelper::packed_msg(const msg_text msg_input, std::vector<unsigned char>& element)
 {
-    const char ID_msg = rps[3];
+    // Length msg
+    unsigned long len = msg_input.msg.length()+9;
+    unsigned char len_byte[4];
+    memcpy(len_byte, &len, 4);
+
+    // ID msg
+    unsigned char ID_byte[4];
+    static unsigned int ID_msg = 1;
+
+    ID_msg = (ID_msg==0)?ID_msg++:ID_msg;
+
+    if (msg_input.type_msg != RSP)
+    {
+        memcpy(ID_byte, &ID_msg, 4);
+    }
+    else
+    {
+        if(msg_input.ID == 0)
+        {
+            printf("=> Haven't insert ID of the msg you want to send respond");
+            return false;
+        }
+        else
+        {
+            memcpy(ID_byte, &msg_input.ID, 4);
+        }
+    };
+
+
+    for(unsigned int i = 0; i<len; i++)
+    {
+        if (i<4)
+        {
+            element.push_back(len_byte[i]);
+        }
+        else if (i == 4)
+        {
+            element.push_back(msg_input.type_msg);
+        }
+        else if (i<9)
+        {
+            element.push_back(ID_byte[i-5]);
+        }
+        else
+        {
+            if (msg_input.type_msg<2)
+            {
+                element.push_back(static_cast<unsigned char>(msg_input.msg[i-9]));
+            }
+        };
+    };
+    ID_msg++;
+    return true;
+}
+
+void TCPhelper::msg_confirm(const msg_text rsp)
+{
     unsigned long i;
     for (i=0; i < this->rps_timeout_list.size(); i++)
     {
-        if(rps_timeout_list[i].ID == ID_msg)
+        if(rps_timeout_list[i].msg.ID == rsp.ID)
         {
             rps_timeout_list.erase(rps_timeout_list.begin()+static_cast<long>(i));
             break;
@@ -238,37 +224,36 @@ int TCPserver::acceptor(int server_fd, client_list& client_socket_list)
 {
     struct sockaddr client_addr;
     unsigned int size_client_address = sizeof(client_addr);
-    int socket_for_client;
+    int client_socket;
 
-    if((socket_for_client = accept(server_fd, &client_addr, &size_client_address))<0)
+    if((client_socket = accept(server_fd, &client_addr, &size_client_address))<0)
     {
-        perror("=> Accept error");
         return -1;
     }
     else
     {
         std::unique_lock<std::mutex> locker(fd_set_mutex);
-        FD_SET(socket_for_client, &master);
-        client_fds.push_back(socket_for_client);
-        fd_max = (socket_for_client > fd_max)?socket_for_client:fd_max;
+        FD_SET(client_socket, &master);
+        client_fds.push_back(client_socket);
+        fd_max = (client_socket > fd_max)?client_socket:fd_max;
         locker.unlock();
 
-        client_socket_list.add_fd(socket_for_client);
+        client_socket_list.add_fd(client_socket);
 
         // Set non-blocking to new socket.
-        long arg = fcntl(socket_for_client, F_GETFL, NULL);
+        long arg = fcntl(client_socket, F_GETFL, NULL);
         arg |= O_NONBLOCK;
         fcntl(server_fd, F_SETFL, arg);
 
         // Show client information to terminal
         char IPclient[INET6_ADDRSTRLEN];
         inet_ntop(client_addr.sa_family,&(reinterpret_cast<struct sockaddr_in* >(&client_addr)->sin_addr),IPclient, INET6_ADDRSTRLEN);
-        printf("=> New conection from %s on socket %d\n",IPclient,socket_for_client);
+        printf("=> New conection from %s on socket %d\n",IPclient,client_socket);
     };
-    return socket_for_client;
+    return client_socket;
 };
 
-int TCPserver::reciver(int server_fd, client_list& client_socket_list, msg_queue& msg_wts)
+int TCPserver::recv_msg(int server_fd, client_list& client_socket_list, msg_queue& msg_wts, thread_pool& threads)
 {
     std::unique_lock<std::mutex> locker(fd_set_mutex);
     fd_set read_fds = this->master;
@@ -281,87 +266,386 @@ int TCPserver::reciver(int server_fd, client_list& client_socket_list, msg_queue
 
     if (FD_ISSET(server_fd, &read_fds))
     {
-        this->acceptor(server_fd, client_socket_list);
+        // Open new thread to accept the new connection;
+        threads.enqueue([&]()
+        {
+            this->acceptor(server_fd, client_socket_list);
+        });
     };
 
     for (unsigned long i=0; i < this->client_fds.size(); i++)
-    {
+    {        
         if(FD_ISSET(this->client_fds[i], &read_fds))
         {
-            char recv_buffer[bufsize] = {0};
-            long status = 0;
+            const unsigned int bufsize = 1024;
+            unsigned char recv_buffer[bufsize] = {0};
+            long num_data = 0;
 
-            if ((status=recv(client_fds[i], recv_buffer, bufsize,0)) <=0)
+            if ((num_data=recv(this->client_fds[i], recv_buffer, bufsize,0)) <=0)
             {
-                if ((status == -1) && ((errno == EAGAIN)|| (errno == EWOULDBLOCK)))
+                if ((num_data == -1) && ((errno == EAGAIN)|| (errno == EWOULDBLOCK)))
                 {
                     perror("=> Message is not gotten complete !!");
                 }
                 else
                 {
-                    if (status == 0)
+                    if (num_data == 0)
                     {
-                        printf("=> Connect client has been close, soket: %d\n",client_fds[i]);
+                        printf("=> Connect client has been close, soket: %d\n",this->client_fds[i]);
                     }
                     else
                     {
                         printf("=> Error socket.");
                     };
-
-                    this->closer(client_fds[i], client_socket_list);
+                    this->closer(this->client_fds[i], client_socket_list);
                 };
             }
             else
             {
-                client_information* host_msg;
-                host_msg = client_socket_list.get_by_fd(client_fds[i]);
-
-                bool is_msg_usable = this->unpacked_msg(recv_buffer, host_msg->msg_incompleted, host_msg->ID_msg_incompleted);
-
-                if (is_msg_usable)
-                {                    
-                    if (host_msg->msg_incompleted.substr(0,3).compare("RSP"))
-                    {
-                        std::cout << "Message "<<(int) host_msg->ID_msg_incompleted <<" from client on socket " << client_fds[i] << ":" << host_msg->msg_incompleted <<std::endl;
-
-                        std::string RSP = "RSP";
-                        std::string msg = RSP + host_msg->ID_msg_incompleted + "/";
-                        msg_wts.push_respond(msg+std::to_string(client_fds[i]));
-                        printf("=> Have sent RPS for message %d for socket %d \n", host_msg->ID_msg_incompleted, client_fds[i]);
-
-                        if(host_msg->msg_incompleted.compare("PING"))
-                        {
-                            process_on_buffer_recv(host_msg->msg_incompleted.c_str(), client_socket_list, client_fds[i], msg_wts);
-                        };
-                    }
-                    else
-                    {
-                        // Delete key message timeout.
-                        this->msg_confirm(host_msg->msg_incompleted);
-                        printf("=> Get RPS for message %d for socket %d \n", host_msg->msg_incompleted[3], client_fds[i]);
-                    };
-                };
+                threads.enqueue([&, this, i]()
+                {
+                    this->process_on_buffer_recv(recv_buffer, num_data, client_socket_list, this->client_fds[i], msg_wts);
+                });
             };
         };
     };
     return 0;
 };
 
-void TCPserver::closer(int server_fd, client_list& client_socket_list)
+void TCPserver::process_on_buffer_recv(const unsigned char buffer[],  const long num_data, client_list& client_socket_list, const int host_socket_fd, msg_queue& msg_wts)
+{
+    // Test file
+    printf("=> Process msg thread start! %d\n", host_socket_fd);
+
+    std::vector<unsigned char> buffer_test;
+    buffer_test.insert(buffer_test.end(), &buffer[0], &buffer[num_data]);
+
+    msg_text msg_test;
+    this->unpacked_msg(msg_test, buffer_test);
+
+    printf("   Type of msg from client: %d\n", static_cast<int>(msg_test.type_msg));
+    printf("   ID of msg from client: %d\n", static_cast<int>(msg_test.ID));
+    std::cout << "   MSG: " << msg_test.msg << std::endl;
+
+    // Process
+    client_information* host_msg;
+    host_msg = client_socket_list.get_by_fd(host_socket_fd);
+
+    std::vector<unsigned char> buffer_all;
+    if(!host_msg->buffer.empty())
+        buffer_all = host_msg->buffer;
+    buffer_all.insert(buffer_all.end(), &buffer[0], &buffer[num_data]);
+
+    msg_text msg_get;
+
+    bool is_msg_usable = this->unpacked_msg(msg_get, buffer_all);
+    host_msg->buffer.clear();
+
+    if (!is_msg_usable)
+    {
+        host_msg->buffer = buffer_all;
+    }
+    else
+    {
+        if(RSP == msg_get.type_msg)
+        {
+            printf("   Get RPS for message %d for socket %d \n", msg_get.ID, host_socket_fd);
+            this -> msg_confirm(msg_get);
+        }
+        else
+        {
+            // Push rsp
+            msg_text rsp;
+            rsp.type_msg = RSP;
+            rsp.ID = msg_get.ID;
+
+            q_element element;
+            element.socket_fd = host_socket_fd;
+            this -> packed_msg(rsp, element.content);
+            msg_wts.push(element, Q_RSP);
+
+            // Analyser msg got
+            switch(msg_get.type_msg)
+            {
+                case PIG:
+                    std::cout << "   Message PING "<< static_cast<int>(msg_get.ID)<<" from client on socket: " << host_socket_fd << std::endl;
+                    break;
+                case SGI:
+                {
+                    std::cout << "   Message LOGIN "<< static_cast<int>(msg_get.ID)<<" from client on socket " << host_socket_fd << ":" << msg_get.msg <<std::endl;
+                    int old_socket_fd = client_socket_list.set_user_name(host_socket_fd,msg_get.msg.c_str());
+                    if((old_socket_fd > 0) && (old_socket_fd != host_socket_fd))
+                    {
+                        std::unique_lock<std::mutex> locker(fd_set_mutex);
+                        FD_CLR(old_socket_fd, &master);
+                        close(old_socket_fd);
+                        for (unsigned long i=0; i < this->client_fds.size(); i++)
+                        {
+                            if (client_fds[i] == old_socket_fd)
+                            {
+                                client_fds.erase(client_fds.begin()+static_cast<long>(i));
+                            };
+                        };
+                        locker.unlock();
+                    }
+                    else
+                    {
+                        // Get file msg and send to client.
+                        std::ifstream read_file;
+                        std::string nameof = "../build-serverSocketTCP-Desktop_Qt_5_11_1_clang_64bit-Debug/clientmsg/"+msg_get.msg+".txt";
+                        read_file.open(nameof);
+
+                        if (!read_file.fail())
+                        {
+                            msg_text msg_history;
+                            msg_history.type_msg = MSG;
+
+                            while(!read_file.eof())
+                            {
+                                getline(read_file,msg_history.msg);
+                                if(!msg_history.msg.empty())
+                                {
+                                    q_element element;
+                                    element.socket_fd = host_socket_fd;
+                                    this -> packed_msg(msg_history, element.content);
+                                    msg_wts.push(element, Q_MSG);
+                                };
+                            };
+
+                            read_file.close();
+
+                            if( remove( nameof.c_str() ) != 0 )
+                                perror( "=> Error deleting file" );
+                            else
+                                printf( "=> File successfully deleted" );
+                        }
+                        else
+                        {
+                            printf("=> History msg of this client is clear!! \n");
+                            read_file.close();
+                        };
+                    };
+                    break;
+                };
+                case MSG:
+                {
+                    std::cout << "   Message "<< static_cast<int>(msg_get.ID)<<" from client on socket " << host_socket_fd << ":" << msg_get.msg <<std::endl;
+
+                    std::vector<std::string> container;
+                    splits_string(msg_get.msg, container);
+
+                    msg_text msg_trasnsfer;
+                    msg_trasnsfer.type_msg = MSG;
+
+                    if(container[0].compare("All"))
+                    {
+                        // MSG: forward_user_name/msg;
+                        // Format message
+                        int forward_fd = client_socket_list.get_fd_by_user_name(container[0].c_str());
+                        forward_fd = client_socket_list.is_online(forward_fd);
+
+                        if (forward_fd < 0)
+                        {
+                            msg_trasnsfer.msg  = "Sorry,"+container[0]+" can't rely you right now!!";
+
+                            q_element element;
+                            element.socket_fd = host_socket_fd;
+                            this -> packed_msg(msg_trasnsfer, element.content);
+                            msg_wts.push(element, Q_MSG);
+
+                            // Save msg with file name is the name of forward user.
+                            std::ofstream write_file;
+                            std::string nameof = "../build-serverSocketTCP-Desktop_Qt_5_11_1_clang_64bit-Debug/clientmsg/"+container[0]+".txt";
+                            write_file.open(nameof, std::fstream::app);
+
+                            std::string str(host_msg->user_name);
+
+                            write_file << str+">"+container[1]<< std::endl;
+
+                            write_file.close();
+                        }
+                        else
+                        {
+                            std::string str(host_msg->user_name);
+                            msg_trasnsfer.msg = str+">"+container[1];
+
+                            q_element element;
+                            element.socket_fd = forward_fd;
+                            this -> packed_msg(msg_trasnsfer, element.content);
+                            msg_wts.push(element, Q_MSG);
+                        };
+                    }
+                    else
+                    {
+                        std::string str(host_msg->user_name);
+                        msg_trasnsfer.msg = str+">"+container[1];
+
+                        for (unsigned long i=0; i< client_socket_list.size(); i++)
+                        {
+                            std::string message;
+                            client_information* forward_msg;
+                            forward_msg = client_socket_list.get_by_order(i);
+
+                            if(forward_msg->socket_fd != host_socket_fd)
+                            {
+                                q_element element;
+                                element.socket_fd =  forward_msg->socket_fd;
+                                this -> packed_msg(msg_trasnsfer, element.content);
+                                msg_wts.push(element, Q_MSG);
+                            };
+                        };
+                    };
+                    break;
+                };
+            };
+        };
+    };
+};
+
+void TCPserver::send_msg(msg_queue& msg_wts, bool& end_connection, client_list& client_socket_list, thread_pool& threads)
+{
+    while(!end_connection)
+    {
+        // Prioritize send all respond before send msg
+        bool is_rsp = false;
+
+        q_element element;
+        element.content.clear();
+
+        if (!msg_wts.is_empty(Q_RSP))
+        {
+            is_rsp = true;
+            element = msg_wts.get(Q_RSP);
+        }
+        else if(!msg_wts.is_empty(Q_MSG))
+        {
+            is_rsp = false;
+            element = msg_wts.get(Q_MSG);
+        };
+
+        if(element.content.empty())
+        {
+            // There is no msg or rsp to send
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        else
+        {
+            // Prepared sending buffer
+            unsigned char buffer[element.content.size()];
+            std::copy(element.content.begin(), element.content.end(), buffer);
+
+            // Send all msg
+            fd_set send_fds;
+            unsigned long total_bytes, byte_left, sended_bytes;
+            total_bytes = element.content.size();
+            byte_left = total_bytes;
+            sended_bytes = 0;
+            int try_times = 0;
+
+            while(sended_bytes < total_bytes)
+            {
+                FD_ZERO(&send_fds);
+                FD_SET(element.socket_fd,&send_fds);
+                if (select(element.socket_fd+1,nullptr, &send_fds, nullptr, &general_tv) <0)
+                {
+                    perror("=>Select ");
+                    this->closer(element.socket_fd,client_socket_list);
+                };
+
+                if(FD_ISSET(element.socket_fd, &send_fds))
+                {
+                    long status = send(element.socket_fd, buffer+sended_bytes, byte_left, 0);
+                    if (status < 0)
+                    {
+                        // Undefined error on send().
+                        if (try_times++ > 3)
+                        {
+                            printf("=> Sending failure !!!");
+                            this->closer(element.socket_fd,client_socket_list);
+                        };
+                    }
+                    else
+                    {
+                        // Send a part of message.
+                        sended_bytes += static_cast<unsigned long>(status);
+                        byte_left -= static_cast<unsigned long>(status);
+                    };
+                }
+                else
+                {
+                    // Timeout when socket buffer is full.
+                    printf("=> Socket is not ready to send data!! \n");
+                    if (try_times++ > 3)
+                    {
+                        printf("=> Error on sending message");
+                        this->closer(element.socket_fd,client_socket_list);
+                    };
+                };
+            };
+
+            msg_text msg_unpacked;
+            this->unpacked_msg(msg_unpacked, element.content);
+
+            if(is_rsp)
+            {
+                msg_wts.pop(Q_RSP);
+                printf("=> Send RSP for msg ID %d , on socket %d \n", msg_unpacked.ID, element.socket_fd);
+
+            }
+            else
+            {
+                msg_wts.pop(Q_MSG);
+
+                msg_text msg_unpacked;
+                this->unpacked_msg(msg_unpacked, element.content);
+
+                rps_timeout timepoint;
+                timepoint. msg = msg_unpacked;
+                timepoint.timeout = std::chrono::system_clock::now();
+                timepoint.socket = element.socket_fd;
+                rps_timeout_list.push_back(timepoint);
+            }
+        };
+    };
+};
+
+void TCPserver::post_send_process(const q_element element, const bool is_rsp, msg_queue& msg_wts)
+{
+    printf("=> It's gool to run");
+    if(is_rsp)
+    {
+        msg_wts.pop(Q_RSP);
+    }
+    else
+    {
+        msg_wts.pop(Q_MSG);
+
+        msg_text msg_unpacked;
+        this->unpacked_msg(msg_unpacked, element.content);
+
+        rps_timeout timepoint;
+        timepoint. msg = msg_unpacked;
+        timepoint.timeout = std::chrono::system_clock::now();
+        timepoint.socket = element.socket_fd;
+        rps_timeout_list.push_back(timepoint);
+    }
+}
+
+void TCPserver::closer(int client_fd, client_list& client_socket_list)
 {
     std::unique_lock<std::mutex> locker(fd_set_mutex);
-    FD_CLR(server_fd, &master);
-    close(server_fd);
+    FD_CLR(client_fd, &master);
+    close(client_fd);
     for (unsigned long i=0; i < this->client_fds.size(); i++)
     {
-        if (client_fds[i] == server_fd)
+        if (client_fds[i] == client_fd)
         {
             client_fds.erase(client_fds.begin()+static_cast<long>(i));
         };
     };
     locker.unlock();
 
-    client_socket_list.delete_fs_num(server_fd);
+    client_socket_list.off_client(client_fd);
 }
 
 void TCPserver::timeout_clocker(bool& end_connection, client_list& client_socket_list)
@@ -383,3 +667,5 @@ void TCPserver::timeout_clocker(bool& end_connection, client_list& client_socket
         };
     };
 }
+
+

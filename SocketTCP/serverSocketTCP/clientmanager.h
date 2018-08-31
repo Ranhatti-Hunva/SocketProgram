@@ -14,36 +14,33 @@
 struct  client_information
 {
     char user_name[256];
-    int num_socket;
-//    std::queue<std::string> msg_queue;
-    std::string msg_incompleted;
-    char ID_msg_incompleted;
+    int socket_fd;    
     bool is_online;
+
+    // Save uncompleted buffer get from recv();
+    std::vector<unsigned char> buffer;
 };
 
 class client_list{
     std::vector <client_information> client_list;
     std::mutex client_mutext;
 
-    int remove_by_order(unsigned long order);
+//    int remove_by_order(unsigned long order);
 public:
     void add_fd(int fd_num);
-
     int set_user_name(int fd_num, const char* user_name);
 
     client_information* get_by_fd(int fd_num);
-
-    int delete_fs_num(int fd_num);
-
     client_information* get_by_order(unsigned long order);
 
     int get_fd_by_user_name(const char* user_name);
 
     int is_online(int fd_num);
-
     void off_client(int fd_num);
 
     unsigned long size();
+
+//    int delete_fs_num(int fd_num);
 };
 
 #endif // CLIENTMANAGER_H
