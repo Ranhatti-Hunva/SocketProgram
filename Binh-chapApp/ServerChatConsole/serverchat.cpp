@@ -67,7 +67,7 @@ bool ServerChat::listenSocket(int sock, int backLog){
 //-----------------------------------------------------------------------------
 void clientQRecv(struct msg_text msgHandle, std::vector <clientNode> &clientList){
     ClientManage cliManage;
-    char *msgbuf = new char(msgHandle.msg.size());
+    char *msgbuf = new char[msgHandle.msg.size()];
     strcpy(msgbuf,msgHandle.msg.c_str());
     std::cout<<"\n msg :"<<msgHandle.msg<<"\n";
     switch(msgHandle.type_msg){
@@ -85,13 +85,17 @@ void clientQRecv(struct msg_text msgHandle, std::vector <clientNode> &clientList
     case MSG:
         cliManage.sendMsgToClient(clientList,msgbuf,msgHandle.socketfd);
         break;
+    case RSP:
+        std::cout<<"rsp id msg: " <<msgHandle.ID<< " from socket "<<msgHandle.socketfd <<"\n";
+        break;
     default:
         break;
     }
+    delete [] msgbuf;
 }
 
 //-----------------------------------------------------------------------------
-void clientQSend(struct msg_text msgHandle, std::vector <clientNode> &clientList){
+void clientQSend(struct msg_text msgHandle/*, std::vector <clientNode> &clientList*/){
 //    ClientManage cliManage;
 //    char *msgbuf = new char(msgHandle.msg.size());
 //    strcpy(msgbuf,msgHandle.msg.c_str());
@@ -115,21 +119,14 @@ void clientQSend(struct msg_text msgHandle, std::vector <clientNode> &clientList
 // wait connect
 // close listening socket
 // loop
-// in loop:  client connect check db, has client -> show name - status on
-//           hasn't client yet -> add db -> show name -status on
-//           check db client has msg recv -> send msg to client
+// in loop:  client connect check profile, has client -> show name - status on
+//           hasn't client yet -> add profile -> show name -status on
+//           check profile client has msg recv -> send msg to client
 //           client disconnect -> show name - status off
 //           client chat all -> broadcast msg to all client online
-//           client chat personal -> send msg if online else store msg in db
+//           client chat personal -> send msg if online else store msg in file
 
 
-//struct clientNode{
-//    char *name;
-//    bool status;
-//    int socketfd;
-//    struct msgType *msg;
-//    int id;
-//};
 void ServerChat::mainLoop(){
 
     FD_ZERO(&listener);
@@ -139,8 +136,7 @@ void ServerChat::mainLoop(){
 
     fdmax = sockfd;
     int flag = 0;
-//    int clientOnline = 0;
-//    std::map<int,char*> clientSock;
+
     fcntl(sockfd, F_SETFL, O_NONBLOCK);
 
     // tao list client
@@ -153,12 +149,6 @@ void ServerChat::mainLoop(){
     }
     //clientNode clientTemp[1];
     int clientSocket = -1;
-
-
-    //std::cout << "number = 5\n";
-
-
-
 
     while(1){
         read_fds = listener;
@@ -193,8 +183,9 @@ void ServerChat::mainLoop(){
                 } else {
                     // handling data from client
                     // khong nhan duoc data tu clien -> dong ket noi client
-
-                    if((nbytes = recv(i,buf,4096,0))<=0){
+                    unsigned char *buf = new unsigned char[2048];
+                    memset(buf,0,2048);
+                    if((nbytes = recv(i,buf,2048,0))<=0){
                         if(nbytes == 0){
                             // close connect
                             // chuyen trang thai stt sang offline
@@ -233,34 +224,27 @@ void ServerChat::mainLoop(){
                            truyen tung nguoi hoac truyen tat ca
                            send -> deQmsg
                         */
-
-                        // truyen tung nguoi
-
-                        // truyen tat ca
-                        std::ostringstream  number_str;
-
-                        number_str << i;
-
-                        //strcat(buf,(number_str.str()).c_str());
                         struct msg_text recvMsg,rspMsg;
                         recvMsg.ID = 0;
                         recvMsg.msg ="";
                         recvMsg.type_msg = -1;
                         recvMsg.socketfd = i;
 
-                        bool is_success = handlMsg.unpacked_msg(recvMsg,buf,nbytes);
+                        handlMsg.unpacked_msg(recvMsg,buf,nbytes);
 
-                        rspMsg.ID = recvMsg.ID;
+                        if(recvMsg.type_msg == MSG || recvMsg.type_msg == PIG){
+                            rspMsg.ID = recvMsg.ID;
 
-                        std::cout<<"msg id :"<<recvMsg.ID<<"\n";
+                            std::cout<<"msg id :"<<recvMsg.ID<<"\n";
 
-                        rspMsg.type_msg = RSP;
-                        rspMsg.msg = "";
-                        rspMsg.socketfd = i;
+                            rspMsg.type_msg = RSP;
+                            rspMsg.msg = "";
+                            rspMsg.socketfd = i;
+                            qSend.push(rspMsg);
+                        }
+
                         qRecv.push(recvMsg);
-                        qSend.push(rspMsg);
-
-                        memset(buf,0,4096);
+                        delete[] buf;
                     }
                 }
             }
@@ -277,8 +261,18 @@ void ServerChat::mainLoop(){
             });
             qRecv.pop();
         }
-
-
+        if(!qSend.empty()){
+            struct msg_text qMsg;
+            qMsg.ID = qSend.front().ID;
+            qMsg.msg = qSend.front().msg;
+            qMsg.type_msg = qSend.front().type_msg;
+            qMsg.socketfd = qSend.front().socketfd;
+           // sleep(6); //test timeout
+            pool.enqueue([qMsg]{
+                clientQSend(qMsg);
+            });
+            qSend.pop();
+        }
 
     }    // end while -close socket
 

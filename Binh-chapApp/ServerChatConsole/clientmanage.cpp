@@ -21,6 +21,7 @@ void ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,int 
 
             clientList[i].status = true;
             clientList[i].socketfd = socketfd;
+            usleep(1000);
             std::ifstream infile;
             char * filename = new char[strlen(clientList[i].name)];
             strcpy(filename,clientList[i].name);
@@ -28,10 +29,23 @@ void ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,int 
             infile.open(strcat(filename,".txt"));
             if(infile.is_open() == true){
                 while(!infile.eof()){
-                    char a[1024];
+                    char * a = new char [1024];
                     infile.getline(a,1024);
-                    send(clientList[i].socketfd,a,strlen(a),0);
-                    std::cout<<std::string(a,0,250)<<"\n";
+
+                    //dong goi data
+                    struct msg_text msgSend;
+                    msgSend.type_msg = MSG;
+
+                    msgSend.msg.assign(std::string(a,0,strlen(a)));
+                    unsigned char buffer[msgSend.msg.length()+9];
+                    HandleMsg handleMsg;
+                    handleMsg.packed_msg(msgSend,buffer);
+
+
+                    send(clientList[i].socketfd,buffer,sizeof(buffer),0);
+                    usleep(1000);
+                    std::cout<<std::string(a,0,1024)<<"\n";
+                    delete []a;
                 }
                 infile.close();
                 std::ofstream ofs;
@@ -39,13 +53,6 @@ void ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,int 
                 ofs.close();
             }
 
-            //
-            //
-            //               infile.open("vietjack.dat");
-
-            //               cout << "\n===========================\n" ;
-            //               cout << "Doc du lieu co trong file!" << endl;
-            //               infile >> data;
 
             break;
             //configClientFlag = true;
@@ -90,8 +97,8 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,char *ms
     //char nameClientSend[20];
     //char nameClientRecv[20];
     //char msgData[4096];
-    char bufSend[4096];
-    memset(bufSend,0,4096);
+    char * bufSend = new char [2048];
+    memset(bufSend,0,2048);
     char *dataMsg = new char [strlen(msg)];
     strcpy(dataMsg,msg);
     char *nameClientSend = std::strtok(msg,"/");
@@ -122,13 +129,27 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,char *ms
             break;
         }
     }
+    delete [] dataMsg;
+
+
+    //dong goi data
+    struct msg_text msgSend;
+    msgSend.type_msg = MSG;
+
+    msgSend.msg.assign(std::string(bufSend,0,strlen(bufSend)));
+    unsigned char buffer[msgSend.msg.length()+9];
+    HandleMsg handleMsg;
+    handleMsg.packed_msg(msgSend,buffer);
+
+
+
 
     if(strcmp(nameClientSend,"all")==0){
         for(int i = 0; i < MAX_CLIENT ; i++){
             if(clientList[i].status == true && clientList[i].socketfd != socketfd){
 
                 // dong goi truoc khi send
-                send(clientList[i].socketfd ,bufSend,strlen(bufSend),0);
+                send(clientList[i].socketfd ,buffer,sizeof(buffer),0);
             }
         }
     }
@@ -140,7 +161,7 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,char *ms
             }
             if(strcmp(clientList[i].name,nameClientSend) == 0){
                 if(clientList[i].status == true){
-                    send(clientList[i].socketfd ,bufSend,strlen(bufSend),0);
+                    send(clientList[i].socketfd ,buffer,sizeof(buffer),0);
                     flag = true;
                 }
                 else{
@@ -169,6 +190,7 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,char *ms
             std::cout<< "client does not exist or wrong format\n";
         }
     }
+    delete [] bufSend;
 
 }
 

@@ -86,7 +86,7 @@ private:
     char* m_ipAddr;
     char* m_port;
 
-    unsigned char *buf = new unsigned char[4096];    // buffer for client data
+     /*= new unsigned char[1024]*/;    // buffer for client data
     int nbytes;
 
     char remoteIP[INET6_ADDRSTRLEN];
