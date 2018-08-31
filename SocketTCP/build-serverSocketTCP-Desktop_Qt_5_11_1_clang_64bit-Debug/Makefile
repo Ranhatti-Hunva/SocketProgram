@@ -226,7 +226,8 @@ DIST          = /Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/spec_pre.prf
 		../serverSocketTCP/serverSocketTCP.pro ../serverSocketTCP/clientmanager.h \
 		../serverSocketTCP/iosocket.h \
 		../serverSocketTCP/tcphelper.h \
-		../serverSocketTCP/msgqueue.h ../serverSocketTCP/main.cpp \
+		../serverSocketTCP/msgqueue.h \
+		../serverSocketTCP/threadpool.h ../serverSocketTCP/main.cpp \
 		../serverSocketTCP/clientmanager.cpp \
 		../serverSocketTCP/iosocket.cpp \
 		../serverSocketTCP/tcphelper.cpp \
@@ -593,7 +594,7 @@ distdir: FORCE
 	@test -d $(DISTDIR) || mkdir -p $(DISTDIR)
 	$(COPY_FILE) --parents $(DIST) $(DISTDIR)/
 	$(COPY_FILE) --parents /Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/data/dummy.cpp $(DISTDIR)/
-	$(COPY_FILE) --parents ../serverSocketTCP/clientmanager.h ../serverSocketTCP/iosocket.h ../serverSocketTCP/tcphelper.h ../serverSocketTCP/msgqueue.h $(DISTDIR)/
+	$(COPY_FILE) --parents ../serverSocketTCP/clientmanager.h ../serverSocketTCP/iosocket.h ../serverSocketTCP/tcphelper.h ../serverSocketTCP/msgqueue.h ../serverSocketTCP/threadpool.h $(DISTDIR)/
 	$(COPY_FILE) --parents ../serverSocketTCP/main.cpp ../serverSocketTCP/clientmanager.cpp ../serverSocketTCP/iosocket.cpp ../serverSocketTCP/tcphelper.cpp ../serverSocketTCP/msgqueue.cpp $(DISTDIR)/
 
 
@@ -644,7 +645,8 @@ compiler_clean: compiler_moc_predefs_clean
 
 ####### Compile
 
-main.o: ../serverSocketTCP/main.cpp ../serverSocketTCP/clientmanager.h \
+main.o: ../serverSocketTCP/main.cpp ../serverSocketTCP/threadpool.h \
+		../serverSocketTCP/clientmanager.h \
 		../serverSocketTCP/iosocket.h \
 		../serverSocketTCP/msgqueue.h \
 		../serverSocketTCP/tcphelper.h

@@ -1,9 +1,19 @@
 #include "tcphelper.h"
-
+#include "iosocket.h"
 
 // TCPhelper contructor, menthod, .....
-std::vector<TCPhelper::rps_timeout> TCPhelper::rps_timeout_list;
-const int TCPhelper::timeout;
+//std::vector<TCPhelper::rps_timeout> TCPhelper::rps_timeout_list;
+//const int TCPhelper::timeout;
+
+void ultoc(unsigned int& ul, unsigned char* cu)
+{
+    ul = 0;
+    for (unsigned int i=0; i<4; i++)
+    {
+        unsigned int j = static_cast<unsigned int>(*cu++) << i*8;
+        ul |= j;
+    };
+};
 
 TCPhelper::TCPhelper()
 {
@@ -43,132 +53,239 @@ struct addrinfo* TCPhelper::get_addinfo_list(std::string host_name, int port_num
     return infor_list;
 };
 
-bool TCPhelper::unpacked_msg(char* buffer, std::string& msg_incomplete, char& ID_msg_incomplete)
+bool TCPhelper::unpacked_msg(msg_text& msg_output, const std::vector<unsigned char> buffer)
 {
-    char* p = buffer;
-    while(*p != 0)
+    if(buffer.size() < 9)
     {
-        switch (*p)
+        // Shortest msg has 9 bytes in length.
+        return false;
+    }
+    else
+    {
+        unsigned int len_msg;
+        unsigned char len_msg_c[4] = {buffer[0],buffer[1],buffer[2],buffer[3]};
+        ultoc(len_msg,len_msg_c);
+
+        if(buffer.size() < len_msg)
         {
-        case 2:
+            return false;
+        }
+        else
         {
-            msg_incomplete.clear();
-            p++;
-            ID_msg_incomplete = *p;
-            break;
-        };
-        case 3:
-        {
+            msg_output.type_msg = buffer[4];
+
+            unsigned char ID_msg_c[4] = {buffer[5],buffer[6],buffer[7],buffer[8]};
+            ultoc(msg_output.ID,ID_msg_c);
+
+            if (msg_output.type_msg < 2)
+            {
+                msg_output.msg.clear();
+
+                for(unsigned long i=9; i<buffer.size(); i++)
+                {
+                    msg_output.msg = msg_output.msg + static_cast<char>(buffer[i]);
+                };
+            };
             return true;
         };
-        default:
-        {
-            msg_incomplete = msg_incomplete + *p;
-            break;
-        };
-        };
-        p++;
     };
-    return false;
-}
+};
 
-char TCPhelper::packed_msg(std::string& msg)
+bool TCPhelper::packed_msg(const msg_text msg_input, std::vector<unsigned char>& element)
 {
-    static char ID = 1;
-    while ((ID==0)||(ID==2)||(ID==3))
+    // Length msg
+    unsigned long len = msg_input.msg.length()+9;
+    unsigned char len_byte[4];
+    memcpy(len_byte, &len, 4);
+
+    // ID msg
+    unsigned char ID_byte[4];
+    static unsigned int ID_msg = 1;
+
+    ID_msg = (ID_msg==0)?ID_msg++:ID_msg;
+
+    if (msg_input.type_msg < 3)
     {
-        ID++;
-    };
-
-    char begin_c = 2;
-    char end_c = 3;
-
-    msg = ID + msg + end_c;
-    msg = begin_c + msg;
-
-    return ID++;
-}
-
-bool TCPhelper::send_msg(int fd, std::string msg, std::vector<rps_timeout>& rps_queue_timeout, bool& is_rps)
-{
-    // Packed and attack the ID for msg. ID is a char.
-    char ID_message = this->packed_msg(msg);
-
-    const unsigned long length_msg = msg.length()+1;
-    char send_buffer[length_msg];
-    memset(&send_buffer, 0, length_msg);
-
-    strcpy(send_buffer, msg.c_str());
-
-    // Put all message to buffer.
-    fd_set send_fds;
-
-    unsigned long total_bytes, byte_left, sended_bytes;
-    total_bytes = msg.length();
-    byte_left = total_bytes;
-    sended_bytes = 0;
-    int try_times = 0;
-
-    while(sended_bytes < total_bytes)
+        memcpy(ID_byte, &ID_msg, 4);
+    }
+    else
     {
-        FD_ZERO(&send_fds);
-        FD_SET(fd,&send_fds);
-        if (select(fd+1,nullptr, &send_fds, nullptr, &general_tv) <0)
+        if(msg_input.ID == 0)
         {
-            perror("=>Select ");
+            printf("=> Haven't insert ID of the msg you want to send respond");
             return false;
-        };
-
-        if(FD_ISSET(fd, &send_fds))
+        }
+        else
         {
-            long status = send(fd, send_buffer+sended_bytes, byte_left, 0);
-            if (status < 0)
+            memcpy(ID_byte, &msg_input.ID, 4);
+        }
+    };
+
+
+    for(unsigned int i = 0; i<len; i++)
+    {
+        if (i<4)
+        {
+            element.push_back(len_byte[i]);
+        }
+        else if (i == 4)
+        {
+            element.push_back(msg_input.type_msg);
+        }
+        else if (i<9)
+        {
+            element.push_back(ID_byte[i-5]);
+        }
+        else
+        {
+            if (msg_input.type_msg<2)
             {
-                // Undefined error on send().
-                if (try_times++ > 3)
-                {
-                    printf("=> Sending failure !!!");
-                    return false;
-                };
+                element.push_back(static_cast<unsigned char>(msg_input.msg[i-9]));
             }
-            else
+        };
+    };
+    ID_msg++;
+    return true;
+}
+
+void TCPclient::send_msg(msg_queue& msg_wts, bool& end_connection, int socket_fd)
+{
+    msg_text msg_login;
+    msg_login.msg = user_name;
+    msg_login.type_msg = SGI;
+
+    std::vector<unsigned char> login_packed;
+    this -> packed_msg(msg_login, login_packed);
+    msg_wts.push(login_packed, Q_MSG);
+
+    while(!end_connection)
+    {
+        int type_msg_send = -1;
+        std::vector<unsigned char> element;
+        element.clear();
+
+        if (false == this->ping)
+        {
+            if (!msg_wts.is_empty(Q_RSP))
             {
-                // Send a part of message.
-                sended_bytes += static_cast<unsigned long>(status);
-                byte_left -= static_cast<unsigned long>(status);
+                type_msg_send = RSP;
+                printf("=> Get RSP");
+                element = msg_wts.get(Q_RSP);
+            }
+            else if(!msg_wts.is_empty(Q_MSG))
+            {
+                type_msg_send = MSG;
+                element = msg_wts.get(Q_MSG);
             };
         }
         else
         {
-            // Timeout when socket buffer is full.
-            printf("=> Socket is not ready to send data!! \n");
-            if (try_times++ > 3)
+            type_msg_send = PIG;
+            msg_text ping;
+            ping.type_msg = PIG;
+            packed_msg(ping, element);
+        };
+
+
+        if(element.empty())
+        {
+            // There is no msg or rsp to send
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        else
+        {
+            //printf("=> Size of element %d \n",element.size());
+
+            // Prepared sending buffer
+            unsigned char buffer[element.size()];
+            std::copy(element.begin(), element.end(), buffer);
+
+            // Send all msg
+            fd_set send_fds;
+            unsigned long total_bytes, byte_left, sended_bytes;
+            total_bytes = element.size();
+            byte_left = total_bytes;
+            sended_bytes = 0;
+            int try_times = 0;
+
+            while(sended_bytes < total_bytes)
             {
-                printf("=> Error on sending message");
-                return false;
+                FD_ZERO(&send_fds);
+                FD_SET(socket_fd,&send_fds);
+                if (select(socket_fd+1,nullptr, &send_fds, nullptr, &general_tv) <0)
+                {
+                    perror("=>Select ");
+                    end_connection = true;
+                    break;
+                };
+
+                if(FD_ISSET(socket_fd, &send_fds))
+                {
+                    long status = send(socket_fd, buffer+sended_bytes, byte_left, 0);
+                    if (status < 0)
+                    {
+                        // Undefined error on send().
+                        if (try_times++ > 3)
+                        {
+                            printf("=> Sending failure !!!");
+                            end_connection = true;
+                            break;
+                        };
+                    }
+                    else
+                    {
+                        // Send a part of message.
+                        sended_bytes += static_cast<unsigned long>(status);
+                        byte_left -= static_cast<unsigned long>(status);
+                    };
+                }
+                else
+                {
+                    // Timeout when socket buffer is full.
+                    printf("=> Socket is not ready to send data!! \n");
+                    if (try_times++ > 3)
+                    {
+                        printf("=> Error on sending message");
+                        end_connection = true;
+                        break;
+                    };
+                };
+            };
+
+            if(RSP == type_msg_send)
+            {
+                msg_wts.pop(Q_RSP);
+            }
+            else if (MSG == type_msg_send)
+            {
+                msg_wts.pop(Q_MSG);
+
+                msg_text msg_unpacked;
+                this->unpacked_msg(msg_unpacked, element);
+
+                rps_timeout timepoint;
+                timepoint. msg = msg_unpacked;
+                timepoint.timeout = std::chrono::system_clock::now();
+                timepoint.socket = socket_fd;
+                rps_timeout_list.push_back(timepoint);
+            }
+            else if (PIG == type_msg_send)
+            {
+                while((!end_connection) && (this->ping))
+                {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                };
             };
         };
     };
-
-    // Save ID massge to waiting respond.
-    if (!is_rps)
-    {
-        rps_timeout timepoint;
-        timepoint.ID = ID_message;
-        timepoint.timeout = std::chrono::system_clock::now();
-        timepoint.socket = fd;
-        rps_queue_timeout.push_back(timepoint);
-    };
-    return true;
 };
 
-void TCPhelper::msg_confirm(const std::string rps)
+void TCPhelper::msg_confirm(const msg_text rsp)
 {
-    const char ID_msg = rps[3];
     unsigned long i;
     for (i=0; i < this->rps_timeout_list.size(); i++)
     {
-        if(rps_timeout_list[i].ID == ID_msg)
+        if(rps_timeout_list[i].msg.ID == rsp.ID)
         {
             rps_timeout_list.erase(rps_timeout_list.begin()+static_cast<long>(i));
             break;
@@ -177,9 +294,6 @@ void TCPhelper::msg_confirm(const std::string rps)
 }
 
 // TCPclient contructor, nmenthod,....
-bool TCPclient::ping;
-char TCPclient::ping_msg_ID;
-
 int TCPclient::connect_with_timeout(struct addrinfo *server_infor)
 {
     // Creat client socket
@@ -255,7 +369,7 @@ int TCPclient::connect_with_timeout(struct addrinfo *server_infor)
     };
 };
 
-int TCPclient::recv_msg(int client_fd)
+int TCPclient::recv_msg(const int client_fd, msg_queue& msg_wts, thread_pool& threads)
 {
     fd_set read_fds;
     FD_ZERO(&read_fds);
@@ -267,22 +381,23 @@ int TCPclient::recv_msg(int client_fd)
         exit(EXIT_FAILURE);
     };
 
-    long num_byte;
+    long num_data;
 
     if (FD_ISSET(client_fd, &read_fds))
     {
-        char recv_buf[bufsize] = {0};
-        if ((num_byte = recv(client_fd,recv_buf,bufsize,0)) <=0 )
+        const unsigned int bufsize = 1024;
+        unsigned char recv_buf[bufsize] = {0};
+        if ((num_data = recv(client_fd,recv_buf,bufsize,0)) <=0 )
         {
-            if ((num_byte == -1) && ((errno == EAGAIN)|| (errno == EWOULDBLOCK)))
+            if ((num_data == -1) && ((errno == EAGAIN)|| (errno == EWOULDBLOCK)))
             {
                 // Recv() is still happening.
-                perror("=> Message is not gotten complete !!. See you next time");
+                perror("=> Message is not gotten complete !!");
                 return 0;
             }
             else
             {
-                if (num_byte == 0)
+                if (num_data == 0)
                 {
                     // Server force close socket
                     printf("=> Connection has been close\n");
@@ -297,10 +412,12 @@ int TCPclient::recv_msg(int client_fd)
         }
         else
         {
-            bool is_msg_usable = this->unpacked_msg(recv_buf, msg_incomplete, ID_msg_incomplete);
-//            std::cout << "=> MSG_incomplete:" << msg_incomplete << ". ID msg: "<< (int)ID_msg_incomplete << std::endl;
 
-            return (is_msg_usable)?1:0;
+            threads.enqueue([&, this]()
+            {
+                this->process_on_buffer_recv(recv_buf, num_data, msg_wts);
+            });
+            return 0;
         };
     }
     else
@@ -308,6 +425,56 @@ int TCPclient::recv_msg(int client_fd)
         return 0;
     };
 };
+
+void TCPclient::process_on_buffer_recv(const unsigned char buffer[], const long num_data, msg_queue& msg_wts)
+{
+//    // Test file
+//    std::vector<unsigned char> buffer_test;
+//    buffer_test.insert(buffer_test.end(), &buffer[0], &buffer[num_data]);
+
+//    msg_text msg_test;
+//    this->unpacked_msg(msg_test, buffer_test);
+
+//    printf("=> Msg from client \n");
+//    printf("   Type of msg from client: %d\n", (int)msg_test.type_msg);
+//    printf("   ID of msg from client: %d\n", (int)msg_test.ID);
+//    std::cout << "   MSG: " << msg_test.msg << std::endl;
+
+    // Process
+    std::vector<unsigned char> buffer_all;
+    buffer_all = this -> buffer;
+    buffer_all.insert(buffer_all.end(), &buffer[0], &buffer[num_data]);
+
+    msg_text msg_get;
+
+    bool is_msg_usable = this->unpacked_msg(msg_get, buffer_all);
+    this->buffer.clear();
+
+    if (!is_msg_usable)
+    {
+        this->buffer = buffer_all;
+    }
+    else
+    {
+        if(RSP == msg_get.type_msg)
+        {
+            this->msg_confirm(msg_get);
+        }
+        else
+        {
+            // Push rsp
+            msg_text rsp;
+            rsp.type_msg = RSP;
+            rsp.ID = msg_get.ID;
+
+            std::vector<unsigned char> element;
+            this -> packed_msg(rsp, element);
+            msg_wts.push(element, Q_RSP);
+
+            std::cout << "Message "<< static_cast<int>(msg_get.ID)<<" from server :" << msg_get.msg <<std::endl;
+        }
+    }
+}
 
 void TCPclient::timeout_clocker(bool& end_connection)
 {
@@ -327,25 +494,25 @@ void TCPclient::timeout_clocker(bool& end_connection)
             else
             {
                 // If ping is processed, check rps of ping. If timeout, stop and restart socket.
-                bool flag_ping = false;
+                bool is_stil_ping = false;
                 unsigned long i;
                 for (i=0; i < rps_timeout_list.size(); i++)
                 {
-                    if(rps_timeout_list[i].ID == ping_msg_ID)
+                    if(rps_timeout_list[i].msg.ID == ping_msg.ID)
                     {
                         std::chrono::duration<float> duration = std::chrono::system_clock::now() - rps_timeout_list[i].timeout;
                         if (duration.count() > timeout)
                         {
                             rps_timeout_list.erase(rps_timeout_list.begin()+static_cast<long>(i));
                             end_connection = true;
-                            flag_ping = true;
+                            is_stil_ping = true;
                         };
                         break;
                     };
                 };
 
                 // Rps_ping has been deleted by msg_confirm.
-                if(false == flag_ping)
+                if(false == is_stil_ping)
                 {
                     rps_timeout_list.erase(rps_timeout_list.begin()+static_cast<long>(i));
                     ping = false;
@@ -354,8 +521,7 @@ void TCPclient::timeout_clocker(bool& end_connection)
         }
         else
         {
-            // Should to use condition_variable().
-            std::this_thread::sleep_for(std::chrono::milliseconds(timeout));
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
         };
     };
 }

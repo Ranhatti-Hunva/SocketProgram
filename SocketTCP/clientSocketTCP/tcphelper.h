@@ -20,6 +20,14 @@
 #include <chrono>
 #include <queue>
 
+#include "msgqueue.h"
+#include "threadpool.h"
+
+#define SGI 0
+#define MSG 1
+#define PIG 2
+#define RSP 3
+
 class TCPhelper
 {    
 protected:
@@ -28,43 +36,37 @@ protected:
 
     struct timeval general_tv;
 
-    static const unsigned int bufsize = 20;
-
-    static const int timeout = 1;
+    const int timeout = 1;
 
 public:
     struct rps_timeout{
-        char ID;
+        msg_text msg;
         std::chrono::system_clock::time_point timeout;
         int socket;
     };
 
-    static std::vector<rps_timeout> rps_timeout_list;
+    std::vector<rps_timeout> rps_timeout_list;
 
     TCPhelper();
     // Get address information from host name.
     struct addrinfo* get_addinfo_list(std::string host_name, int port_num);
 
     // Packed msg ad format <2(char)><msg><3(char)> (2 is Start of Text, 3 is End of Text in ASCII).
-    char packed_msg(std::string& msg);
+    bool packed_msg(const msg_text msg_input, std::vector<unsigned char>& element);
 
     // Unpacked msg.
-    bool unpacked_msg(char* buffer, std::string& msg_incomplete, char& ID_msg_incomplete);
-
-    // Send packed message.
-    bool send_msg(int fd, std::string msg, std::vector<rps_timeout>& rps_queue_timeout, bool& is_rps);
+    bool unpacked_msg(msg_text& msg_output, const std::vector<unsigned char> buffer);
 
     // Get msg confirm
-    void msg_confirm(const std::string rps);
+    void msg_confirm(const msg_text rsp);
 };
 
 class TCPclient: public TCPhelper{
 public:
-    std::string msg_incomplete;
-    char ID_msg_incomplete;
+    std::vector<unsigned char> buffer;
 
-    static bool ping;
-    static char ping_msg_ID;
+    bool ping;
+    msg_text ping_msg;
 
     TCPclient():TCPhelper()
     {
@@ -73,22 +75,19 @@ public:
     }
 
     // Creat new socket and connect to a server with timeout. Let decision to re-connect on user.
-    // If fail by error socket or timeout, return -1;
-    // If success return client_fd > 0;
     int connect_with_timeout(struct addrinfo *server_infor);
 
     // Recive and unpaccked message.
-    // Return 1 if message is gotten completely. An then get msg in msg_incomplete of the object.
-    // Return -1 if connecton fail or disconnect from server.
-    // Return 0 if just got a part of message.
-    int recv_msg(int fd);
+    int recv_msg(const int socket_fd, msg_queue& msg_wts, thread_pool& thread);
 
-    // Ping when error in reponds timeout.
-    // bool pinger(int fd);
+    // Send packed message.
+    void send_msg(msg_queue& msg_wts, bool& end_connection, int socket_fd);
 
-    static void timeout_clocker(bool& end_connection);
+    void process_on_buffer_recv(const unsigned char buffer[], const long num_data, msg_queue& msg_wts);
 
-
+    void timeout_clocker(bool& end_connection);
 };
+
+void ultoc(unsigned int& ul, unsigned char* cu);
 
 #endif // TCPHELPER_H

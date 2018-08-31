@@ -28,4 +28,5 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 HEADERS += \
     iosocket.h \
     tcphelper.h \
-    msgqueue.h
+    msgqueue.h \
+    threadpool.h

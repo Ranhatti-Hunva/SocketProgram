@@ -1,104 +1,74 @@
 #include "iosocket.h"
 #include "tcphelper.h"
+//#include "udphelper.h"
 
-//void send_TCP(user_command& user_command, fd_set& master, int& socket_fd)
-void send_TCP(msg_queue& msg_wts, TCPclient& client_helper, int& socket_fd, bool& end_connection)
+// using to analyser user command.
+void splits_string(const std::string& subject, std::vector<std::string>& container)
 {
-    // If just login, send a msg as format */user_name
-    msg_wts.push_msg("*/"+user_name);
+    container.clear();
+    size_t len = subject.length()+ 1;
+    char* s = new char[ len ];
+    memset(s, 0, len*sizeof(char));
+    memcpy(s, subject.c_str(), (len - 1)*sizeof(char));
+    for (char *p = strtok(s, "/"); p != nullptr; p = strtok(nullptr, "/"))
+    {
+        container.push_back(p);
+    }
+    delete[] s;
+}
 
-    std::string user_cmd_str;
-    user_cmd_str.clear();
-
+void read_terminal(bool& end_connection, TCPclient& client_helper, msg_queue& msg_wts)
+{
     while(!end_connection)
     {
-        // Get unbocking user input from terminal.
         fd_set reader;
+        FD_ZERO(&reader);
         FD_SET(0,&reader);
 
         struct timeval general_tv;
+
         general_tv.tv_sec = 0;
         general_tv.tv_usec = 5000;
 
         select(1,&reader, nullptr, nullptr, &general_tv);
         if (FD_ISSET(0, &reader))
         {
+            std::string user_cmd_str;
             getline(std::cin, user_cmd_str);
-
             if(!user_cmd_str.empty())
             {
-                msg_wts.push_msg(user_cmd_str);
-            };
-        };
-
-        bool is_respond = false;
-        if(false == client_helper.ping)
-        {
-            // Get and send msg or respond if no ping is necessary
-            std::string msg;
-            msg.clear();
-
-            // Prioritize send all respond before send msg
-            if (!msg_wts.respond_empty())
-            {
-                is_respond = true;
-                msg = msg_wts.respond_get();
-            }
-            else if (!msg_wts.msg_empty())
-            {
-                is_respond = false;
-                msg = msg_wts.msg_get();
-            };
-
-            if (!msg.empty())
-            {
-                if(msg.compare("#"))
+                if(user_cmd_str.compare("#"))
                 {
-                    // Send msg.
-                    if(!client_helper.send_msg(socket_fd, msg, client_helper.rps_timeout_list, is_respond))
+                    // Packet msg and push to msg_send_queue
+                    std::vector<std::string> container;
+                    splits_string(user_cmd_str, container);
+
+                    if(container.size() < 2)
                     {
-                        printf("=> Sending failure !!!");
-                        // Exit thread because undifined error on socket.
-                        end_connection = true;
-                        break;
+                        printf("=> Wrong format message or no massge to send !! \n");
                     }
                     else
                     {
-                        // Pop msg or respond out of queue if send sucessful.
-                        (is_respond)?msg_wts.pop_respond():msg_wts.pop_msg();
+                        msg_text msg_send;
+                        msg_send.msg = user_cmd_str;
+                        msg_send.type_msg = MSG;
+
+                        std::vector<unsigned char> element;
+                        client_helper.packed_msg(msg_send, element);
+                        msg_wts.push(element, Q_MSG);
                     };
                 }
                 else
                 {
-                    // Exit thread because of the wish of user.
                     end_connection = true;
                     break;
                 };
-            }
-            else
-            {
-                sleep(1);
             };
-        }
-        else
-        {
-            // Send ping as a message PING
-            if(!client_helper.send_msg(socket_fd, "PING", client_helper.rps_timeout_list, is_respond))
-            {
-                printf("=> Sending failure !!!");
-                /// Exit thread because undifined error on socket.
-                end_connection = true;
-                break;
-            };
-
-            // Get of ping message.
-            client_helper.ping_msg_ID = client_helper.rps_timeout_list.back().ID;
-            std::this_thread::sleep_for(std::chrono::seconds(2));
         };
     };
 };
 
-int is_reconnect(int& client_fd)
+bool is_reconnect(int& client_fd)
 {
     // Ask user if they want to reconnect with server after lose connection.
     std::string answer;
@@ -110,11 +80,11 @@ int is_reconnect(int& client_fd)
 
         if(!answer.compare("Y"))
         {
-            return 0;
+            return false;
         }
         else if (!answer.compare("N"))
         {
-            return -1;
+            return true;
         }
         else
         {

@@ -3,29 +3,38 @@
 
 #include <string>
 #include <string.h>
+#include <vector>
 #include <mutex>
 #include <queue>
 
+#define Q_MSG 0
+#define Q_RSP 1
+
+using namespace std;
+struct msg_text
+{
+    string msg;
+    unsigned char type_msg;
+    unsigned int ID = 0;
+};
+
 class msg_queue{
     std::mutex msg_mutex;
-    std::mutex respond_muxtex;
+    std::mutex rsp_mutex;
 
-    std::queue<std::string> msg_waiting;
-    std::queue<std::string> respond;
+    std::queue<std::vector<unsigned char>> msg;
+    std::queue<std::vector<unsigned char>> rsp;
+
 public:
-    void push_msg(const std::string str);
-    void push_respond(const std::string str);
+    void push(const std::vector<unsigned char> element, int type_queue);
 
-    void clear();
+    void clear(int type_queue);
 
-    void pop_msg();
-    void pop_respond();
+    void pop(int type_queue);
 
-    bool msg_empty();
-    bool respond_empty();
+    bool is_empty(int type_queue);
 
-    std::string msg_get();
-    std::string respond_get();
+    std::vector<unsigned char> get(int type_queue);
 };
 
 #endif // USERCOMAND_H

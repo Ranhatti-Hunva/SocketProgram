@@ -223,7 +223,8 @@ DIST          = /Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/spec_pre.prf
 		/Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/lex.prf \
 		../clientSocketTCP/clientSocketTCP.pro ../clientSocketTCP/iosocket.h \
 		../clientSocketTCP/tcphelper.h \
-		../clientSocketTCP/msgqueue.h ../clientSocketTCP/main.cpp \
+		../clientSocketTCP/msgqueue.h \
+		../clientSocketTCP/threadpool.h ../clientSocketTCP/main.cpp \
 		../clientSocketTCP/iosocket.cpp \
 		../clientSocketTCP/tcphelper.cpp \
 		../clientSocketTCP/msgqueue.cpp
@@ -589,7 +590,7 @@ distdir: FORCE
 	@test -d $(DISTDIR) || mkdir -p $(DISTDIR)
 	$(COPY_FILE) --parents $(DIST) $(DISTDIR)/
 	$(COPY_FILE) --parents /Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/data/dummy.cpp $(DISTDIR)/
-	$(COPY_FILE) --parents ../clientSocketTCP/iosocket.h ../clientSocketTCP/tcphelper.h ../clientSocketTCP/msgqueue.h $(DISTDIR)/
+	$(COPY_FILE) --parents ../clientSocketTCP/iosocket.h ../clientSocketTCP/tcphelper.h ../clientSocketTCP/msgqueue.h ../clientSocketTCP/threadpool.h $(DISTDIR)/
 	$(COPY_FILE) --parents ../clientSocketTCP/main.cpp ../clientSocketTCP/iosocket.cpp ../clientSocketTCP/tcphelper.cpp ../clientSocketTCP/msgqueue.cpp $(DISTDIR)/
 
 
@@ -642,15 +643,20 @@ compiler_clean: compiler_moc_predefs_clean
 
 main.o: ../clientSocketTCP/main.cpp ../clientSocketTCP/msgqueue.h \
 		../clientSocketTCP/iosocket.h \
-		../clientSocketTCP/tcphelper.h
+		../clientSocketTCP/tcphelper.h \
+		../clientSocketTCP/threadpool.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o main.o ../clientSocketTCP/main.cpp
 
 iosocket.o: ../clientSocketTCP/iosocket.cpp ../clientSocketTCP/iosocket.h \
 		../clientSocketTCP/msgqueue.h \
-		../clientSocketTCP/tcphelper.h
+		../clientSocketTCP/tcphelper.h \
+		../clientSocketTCP/threadpool.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o iosocket.o ../clientSocketTCP/iosocket.cpp
 
-tcphelper.o: ../clientSocketTCP/tcphelper.cpp ../clientSocketTCP/tcphelper.h
+tcphelper.o: ../clientSocketTCP/tcphelper.cpp ../clientSocketTCP/tcphelper.h \
+		../clientSocketTCP/msgqueue.h \
+		../clientSocketTCP/threadpool.h \
+		../clientSocketTCP/iosocket.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o tcphelper.o ../clientSocketTCP/tcphelper.cpp
 
 msgqueue.o: ../clientSocketTCP/msgqueue.cpp ../clientSocketTCP/msgqueue.h

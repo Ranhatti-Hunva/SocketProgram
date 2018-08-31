@@ -166,7 +166,7 @@ int TCPserver::server_echo(int port_num)
     int server_fd = -1;
     struct addrinfo *IP_list, *p;
 
-    IP_list = this->get_addinfo_list("",port_num);
+    IP_list = this->get_addinfo_list("10.42.0.194",port_num);
     for(p = IP_list; p != nullptr; p = p->ai_next)
     {
         if ((server_fd = socket(p->ai_family, p->ai_socktype,p->ai_protocol)) == -1)
