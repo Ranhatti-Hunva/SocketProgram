@@ -112,8 +112,7 @@ void recvMsg(unsigned char *buf,int sockfd){
 //------------reconnect function---------------------------------------------------
 bool isReconnect(){
     std::string ans;
-    std::cout<<"co vao 123\n";
-    //return true;
+
     while(1){
         std::cout << "Do you want reconnect to server ? (Y/N)\n";
         //std::cin.ignore();
@@ -233,7 +232,7 @@ int main()
                     //end_connection = true;
                     stop = 1;
                     //std::terminate();
-                    //break;
+                    break;
                 }
                 else if(userInput.size() >0){
 

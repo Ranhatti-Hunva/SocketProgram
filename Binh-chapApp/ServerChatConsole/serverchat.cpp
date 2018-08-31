@@ -128,7 +128,7 @@ void clientQSend(struct msg_text msgHandle/*, std::vector <clientNode> &clientLi
 
 
 void ServerChat::mainLoop(){
-
+    std::cout<<"Server started!!!\n";
     FD_ZERO(&listener);
     FD_ZERO(&read_fds);
     FD_SET(sockfd, &listener);
