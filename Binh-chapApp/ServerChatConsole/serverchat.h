@@ -30,7 +30,7 @@
 
 #define BACKLOG 10
 #define MAX_CLIENT 10
-//std::mutex mutex_ex;
+
 
 //-----struct Modify------------------------------------------------------------
 //struct msgType{
@@ -54,7 +54,7 @@ public:
     bool listenSocket(int sock, int backLog);
     void *get_in_addr(struct sockaddr *sa);
     void cleanUp();
-
+    void clientQRecv(struct msg_text msgHandle, std::vector<clientNode> &clientList);
     //std::vector<clientNode> client();
 
 
@@ -88,8 +88,10 @@ private:
 
      /*= new unsigned char[1024]*/;    // buffer for client data
     int nbytes;
+    int skExist = -1;
 
     char remoteIP[INET6_ADDRSTRLEN];
+    std::mutex mtx;
 };
 
 #endif // SERVERCHAT_H

@@ -14,6 +14,7 @@
 #define PIG 2
 #define RSP 3
 
+
 struct msg_text
 {
     std::string msg;

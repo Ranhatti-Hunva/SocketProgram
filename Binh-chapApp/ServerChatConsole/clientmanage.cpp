@@ -1,13 +1,19 @@
 #include "clientmanage.h"
 #include "handlemsg.h"
+#include <mutex>
+
+std::mutex mtx;
+
 ClientManage::ClientManage()
 {
 
 }
 //login client
-void ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,int socketfd,char * buf){
+int ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,
+                                      int socketfd, char * buf, std::queue<msg_text> &qRecv){
     bool flagCheck = false;
     HandleMsg handle;
+    int socketExist = -1;
     for(int i = 0; i < MAX_CLIENT; i++){
         // gui cac msg khi client offline
 
@@ -17,7 +23,7 @@ void ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,int 
         if(clientList[i].id != -1 && strcmp(clientList[i].name,buf) == 0
                 && clientList[i].status == false){
             flagCheck = true;
-            send(socketfd,"success",7,0);
+            //send(socketfd,"success",7,0);
 
             clientList[i].status = true;
             clientList[i].socketfd = socketfd;
@@ -25,27 +31,34 @@ void ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,int 
             std::ifstream infile;
             char * filename = new char[strlen(clientList[i].name)];
             strcpy(filename,clientList[i].name);
-            std::string e;
+            //std::string e;
             infile.open(strcat(filename,".txt"));
+
             if(infile.is_open() == true){
                 while(!infile.eof()){
-                    char * a = new char [1024];
-                    infile.getline(a,1024);
+                    //char * a = new char [1024];
+                    std::string line;
+                    getline (infile,line);
+                    //infile.getline(a,1024);
 
                     //dong goi data
                     struct msg_text msgSend;
                     msgSend.type_msg = MSG;
 
-                    msgSend.msg.assign(std::string(a,0,strlen(a)));
+                    //msgSend.msg.assign(std::string(a,0,strlen(a)));
+                    msgSend.msg.assign(line);
                     unsigned char buffer[msgSend.msg.length()+9];
                     HandleMsg handleMsg;
                     handleMsg.packed_msg(msgSend,buffer);
 
-
-                    send(clientList[i].socketfd,buffer,sizeof(buffer),0);
+                    //qRecv.push(msgSend);
                     usleep(1000);
-                    std::cout<<std::string(a,0,1024)<<"\n";
-                    delete []a;
+                    send(clientList[i].socketfd,buffer,sizeof(buffer),0);
+
+
+                    std::cout<<line<<"\n";
+                    //std::cout<<std::string(a,0,1024)<<"\n";
+                    //delete []a;
                 }
                 infile.close();
                 std::ofstream ofs;
@@ -61,9 +74,17 @@ void ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,int 
         // da ton tai username do roi
         else if(clientList[i].id != -1 && strcmp(clientList[i].name,buf) == 0
                 && clientList[i].status == true){
-            std::cout<<"client is existed\n";
+            //std::cout<<"client is existed\n";
             flagCheck = true;
-            send(socketfd,"existed",7,0);
+            //send(socketfd,"existed",7,0);
+
+            //mtx.lock();
+            //close(clientList[i].socketfd);
+            //FD_CLR(clientList[i].socketfd,&listener);
+            //mtx.unlock();
+            socketExist = clientList[i].socketfd;
+            clientList[i].socketfd = socketfd;
+
             break;
 
         }
@@ -71,24 +92,25 @@ void ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,int 
         else if(clientList[i].id == -1){
             clientList[i].name = new char[strlen(buf)+1];
             strcpy(clientList[i].name,buf);
-            std::cout<<"client connect info:\n";
-            std::cout<<"client name " << std::string(clientList[i].name,0,strlen(clientList[i].name))<<"\n";
+            std::cout<<"Client connect info: ";
+            std::cout<<"Name " << std::string(clientList[i].name,0,strlen(clientList[i].name))<<" - ";
             std::cout<<"socket "<<socketfd<<"\n";
             clientList[i].id = i;
             clientList[i].socketfd = socketfd;
             //clientSocket = -1;
             clientList[i].status = true;
             flagCheck = true;
-            send(socketfd,"success",7,0);
+            //send(socketfd,"success",7,0);
             break;
         }
     }
 
     if(flagCheck == false){
-        send(socketfd,"full",5,0);
+        //send(socketfd,"full",5,0);
         std::cout<<"socket full "<<socketfd<<"\n";
         std::cout<<"server is full client\n";
     }
+    return socketExist;
 }
 
 //send Msg To client
@@ -141,7 +163,8 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,char *ms
     HandleMsg handleMsg;
     handleMsg.packed_msg(msgSend,buffer);
 
-
+    std::cout<<"\nnameClientSend : "<< std::string(nameClientSend,0,strlen(nameClientSend)) << "\n";
+    std::cout<<"strcmp all: "<<strcmp(nameClientSend,"all")<<"\n";
 
 
     if(strcmp(nameClientSend,"all")==0){

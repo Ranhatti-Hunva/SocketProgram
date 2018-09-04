@@ -81,8 +81,8 @@ bool HandleMsg::unpacked_msg(struct msg_text& msg_output, unsigned char* buffer,
     {
         unsigned int len_msg;
         ultoc(len_msg,buffer);
-        printf("=> Length msg: %u \n", len_msg);
-        printf("=> Num data: %u \n", num_data);
+        //printf("=> Length msg: %u \n", len_msg);
+        //printf("=> Num data: %u \n", num_data);
 
         if(num_data < len_msg)
         {

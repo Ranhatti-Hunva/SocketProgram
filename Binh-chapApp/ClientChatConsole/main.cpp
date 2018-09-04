@@ -1,6 +1,9 @@
 #include "clientchat.h"
 #include "handlemsg.h"
 #include <sys/time.h>
+#include <chrono>
+#include <future>
+#include <queue>
 //----------------------------------------------------------------------------
 #define HOST "localhost"
 #define PORT "8096"
@@ -16,7 +19,7 @@ long int timeOut = 5000; //ms
 void recvMsg(unsigned char *buf,int sockfd){
     long int timeRSP = 0;
     struct timeval tp;
-    while(1){
+    while(stop!=1){
 
         if(ms >0){
             gettimeofday(&tp, nullptr);
@@ -75,6 +78,9 @@ void recvMsg(unsigned char *buf,int sockfd){
         int bytesRecv = recv(sockfd,buf,2048,0);
         // mtx.unlock();
         //mo goi
+
+        //if(std::strcmp(std::string(buf,0,4),"close")==0);
+
         if(bytesRecv >0){
             struct msg_text msg_get;
             struct msg_text msg_rsp;
@@ -101,6 +107,7 @@ void recvMsg(unsigned char *buf,int sockfd){
         if(bytesRecv == 0){
             std::cout << "> server is close \n";
             close(sockfd);
+            stop = 1;
             exit(1);
         }
         if(stop != 0){
@@ -108,6 +115,48 @@ void recvMsg(unsigned char *buf,int sockfd){
         }
         delete[] buf;
     }
+
+}
+//-----struct
+struct timeoutSend{
+  long int time;
+  msg_text msg;
+  int msgId;
+};
+
+
+//-timeout thread------------------------------------------------------------------
+
+
+void timeoutThread(std::vector <timeoutSend> msgSendList){
+    while(1){
+        if(!msgSendList.empty()){
+            struct timeval tp;
+            gettimeofday(&tp, nullptr);
+            if((tp.tv_sec * 1000 + tp.tv_usec / 1000) - msgSendList.front().time > timeOut){
+
+            }
+//            timeoutSend node;
+//            node.msgId = msgSend.ID;
+//            node.time = (tp.tv_sec * 1000 + tp.tv_usec / 1000);
+//            node.msg = msgSend;
+//            msgSendList.push_back(node);
+        }
+    }
+}
+//----thread nhan---------------------------------------------------------------------
+
+void cinFromConsole(){
+
+}
+
+
+
+//---------------------------------------------------------------------------------
+std::string getLineFromCin() {
+    std::string line;
+    std::getline(std::cin, line);
+    return line;
 }
 //------------reconnect function---------------------------------------------------
 bool isReconnect(){
@@ -116,7 +165,9 @@ bool isReconnect(){
     while(1){
         std::cout << "Do you want reconnect to server ? (Y/N)\n";
         //std::cin.ignore();
+        //ans = future.get();
         getline(std::cin,ans);
+        //std::cout<<ans<<"\n";
         if(ans.compare("Y") == 0){
             return true;
         }
@@ -129,7 +180,6 @@ bool isReconnect(){
     }
 }
 
-
 //------------main----------------------------------------------------------
 int main()
 {
@@ -140,8 +190,8 @@ int main()
     unsigned char * bufrcv; // buf for recv data
     char statusBuf[10]; // buf status login
     std::string userInput;
-    //    std::cout << "IP address: ";
-
+    std::vector <timeoutSend> msgSendList;
+    std:: queue <struct msg_text> qSend;
     bool reconnect = true;
 
     while(reconnect){
@@ -185,32 +235,38 @@ int main()
                 memset(statusBuf,0,10);
                 int numRecv = recv(socket,statusBuf,10,0);
                 //mtx.lock();
+                //recv respond
                 if(numRecv >0){
+                    std::cout << "Login success\n";
+                    std::cout << "Start chat now" <<"\n";
+                    std::cout  << "press '#' to exit\n";
+                    break;
+                    //                }
                     //std::cout<<"strcmp success "<<strcmp(statusBuf,"success")<<"\n";
                     //std::cout<<"msg recv "<<std::string(statusBuf,0,10)<<"\n";
-                    if(strcmp(statusBuf,"success") == 0){
-                        std::cout << "Login success\n";
-                        std::cout << "Start chat now" <<"\n";
-                        std::cout  << "press '#' to exit\n";
-                        usleep(1000);
-                        break;
-                    }
-                    if(strcmp(statusBuf,"existed") == 0){
-                        std::cout << "Username is existed please use another name\n>";
+                    //                    if(strcmp(statusBuf,"success") == 0){
+                    //                        std::cout << "Login success\n";
+                    //                        std::cout << "Start chat now" <<"\n";
+                    //                        std::cout  << "press '#' to exit\n";
+                    //                        usleep(1000);
+                    //                        break;
+                    //                    }
+                    //                    if(strcmp(statusBuf,"existed") == 0){
+                    //                        std::cout << "Username is existed please use another name\n>";
 
-                        //std::cin.ignore();
-                        getline(std::cin,name);
-                        msgSend.msg.clear();
-                        msgSend.msg.assign(name);
-                        unsigned char nameResend[msgSend.msg.length()+9];
-                        handleMsg.packed_msg(msgSend,nameResend);
-                        send(socket,nameResend,sizeof(nameResend),0);
-                    }
-                    if(strcmp(statusBuf,"full") == 0){
-                        std::cout << "server is full !!! can't login server\n";
-                        close(socket);
-                        return 1;
-                    }
+                    //                        //std::cin.ignore();
+                    //                        getline(std::cin,name);
+                    //                        msgSend.msg.clear();
+                    //                        msgSend.msg.assign(name);
+                    //                        unsigned char nameResend[msgSend.msg.length()+9];
+                    //                        handleMsg.packed_msg(msgSend,nameResend);
+                    //                        send(socket,nameResend,sizeof(nameResend),0);
+                    //                    }
+                    //                    if(strcmp(statusBuf,"full") == 0){
+                    //                        std::cout << "server is full !!! can't login server\n";
+                    //                        close(socket);
+                    //                        return 1;
+                    //                    }
                 }
             }
 
@@ -223,15 +279,28 @@ int main()
 
             // main thread for send msg
             // press # for logout
+            //auto future = std::async(std::launch::async, getLineFromCin);
             while(1){
-                std::cout  << ">";
+
                 getline(std::cin,userInput);
+
+
+                //std::string line;
+                //if (future.wait_for(std::chrono::seconds(1)) == std::future_status::ready) {
+                //    std::cout  << ">";
+                //    userInput = future.get();
+                //    future = std::async(std::launch::async, getLineFromCin);
+
+                //}
+
+
                 if(strcmp(userInput.c_str(),"#") == 0){
                     send(socket,"",0,0);
                     close(socket);
                     //end_connection = true;
                     stop = 1;
                     //std::terminate();
+                    userInput.clear();
                     break;
                 }
                 else if(userInput.size() >0){
@@ -249,19 +318,32 @@ int main()
                     mtx.lock();
                     struct timeval tp;
                     gettimeofday(&tp, nullptr);
-                    ms = (tp.tv_sec * 1000 + tp.tv_usec / 1000);
+
+                    timeoutSend node;
+                    node.msgId = msgSend.ID;
+                    node.time = (tp.tv_sec * 1000 + tp.tv_usec / 1000);
+                    node.msg = msgSend;
+                    msgSendList.push_back(node);
+
+
                     mtx.unlock();
 
                     if(sendResult == -1){
                         perror("send");
                         break;
                     }
+                    userInput.clear();
                 }
+
             }
+
             //stop thread recv before reconnect
             recvThread.join();
+
         }
+
         reconnect = isReconnect();
+
     }
     return 0;
 }

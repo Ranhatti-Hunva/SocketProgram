@@ -10,13 +10,16 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <vector>
+#include <handlemsg.h>
+
 #define MAX_CLIENT 10
 
 class ClientManage
 {
 public:
     ClientManage();
-    void mapClientWithSocket(std::vector <clientNode> &clientList,int socketfd,char * buf);
+    int mapClientWithSocket(std::vector <clientNode> &clientList,
+                            int socketfd, char * buf, std::queue<msg_text> &qRecv);
     void sendMsgToClient(std::vector <clientNode> &clientList,char *msg, int socketfd);
 };
 

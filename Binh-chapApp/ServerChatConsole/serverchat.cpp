@@ -28,7 +28,7 @@ int ServerChat::createSocket(){
     for( p = servinfo; p!= nullptr; p = p->ai_next){
         sockfd = socket(p->ai_family,p->ai_socktype,p->ai_protocol);
         if(sockfd == -1){
-            perror("server: socket");
+            perror("server : socket");
             continue;
         }
         //check reuse addr
@@ -41,8 +41,8 @@ int ServerChat::createSocket(){
 
         if(bind(sockfd, p->ai_addr, p->ai_addrlen) == -1){
             close(sockfd);
-            perror("server: socket");
-            continue;
+            perror("server : socket");
+            exit(1);
         }
 
         break;
@@ -65,23 +65,26 @@ bool ServerChat::listenSocket(int sock, int backLog){
     return true;
 }
 //-----------------------------------------------------------------------------
-void clientQRecv(struct msg_text msgHandle, std::vector <clientNode> &clientList){
+void ServerChat::clientQRecv(struct msg_text msgHandle, std::vector <clientNode> &clientList){
     ClientManage cliManage;
     char *msgbuf = new char[msgHandle.msg.size()];
     strcpy(msgbuf,msgHandle.msg.c_str());
-    std::cout<<"\n msg :"<<msgHandle.msg<<"\n";
+    std::cout<<"msg :"<<msgHandle.msg<<"\n";
+
     switch(msgHandle.type_msg){
     case SGI:
-        cliManage.mapClientWithSocket(clientList,msgHandle.socketfd,msgbuf);
+        skExist = cliManage.mapClientWithSocket(clientList,msgHandle.socketfd,msgbuf,qRecv);
+        std::cout<<"\n";
         for(int i = 0 ; i < MAX_CLIENT ; i++){
             if(clientList[i].status == true){
-                std::cout<<"name client online "<< std::string(clientList[i].name,0,20) <<" socket "<< clientList[i].socketfd<<"\n";
+                std::cout<<"Name client online "<< std::string(clientList[i].name,0,20) <<" socket "<< clientList[i].socketfd<<"\n";
             }
             else if(clientList[i].id!= -1) {
-                std::cout<<"name client offline "<< std::string(clientList[i].name,0,20) <<"\n";
+                std::cout<<"Name client offline "<< std::string(clientList[i].name,0,20) <<"\n";
             }
         }
         break;
+
     case MSG:
         cliManage.sendMsgToClient(clientList,msgbuf,msgHandle.socketfd);
         break;
@@ -95,10 +98,11 @@ void clientQRecv(struct msg_text msgHandle, std::vector <clientNode> &clientList
 }
 
 //-----------------------------------------------------------------------------
+//send respond
 void clientQSend(struct msg_text msgHandle/*, std::vector <clientNode> &clientList*/){
-//    ClientManage cliManage;
-//    char *msgbuf = new char(msgHandle.msg.size());
-//    strcpy(msgbuf,msgHandle.msg.c_str());
+    //    ClientManage cliManage;
+    //    char *msgbuf = new char(msgHandle.msg.size());
+    //    strcpy(msgbuf,msgHandle.msg.c_str());
 
     HandleMsg grapMsg;
 
@@ -128,11 +132,16 @@ void clientQSend(struct msg_text msgHandle/*, std::vector <clientNode> &clientLi
 
 
 void ServerChat::mainLoop(){
+
+
     std::cout<<"Server started!!!\n";
+
+
+
+
     FD_ZERO(&listener);
     FD_ZERO(&read_fds);
     FD_SET(sockfd, &listener);
-
 
     fdmax = sockfd;
     int flag = 0;
@@ -152,13 +161,19 @@ void ServerChat::mainLoop(){
 
     while(1){
         read_fds = listener;
+
         if(select(fdmax+1,&read_fds, nullptr,nullptr,nullptr) == -1){
             perror("select");
             exit(1);
         }
+
+
         for(int i = 0; i<= fdmax; i++){
+
             if(FD_ISSET(i,&read_fds)){
+
                 //server listening connection
+
                 if(i == sockfd){
                     addrlen = sizeof remoteaddr;
                     newfd = accept(sockfd,(struct sockaddr *)&remoteaddr,&addrlen);
@@ -168,6 +183,7 @@ void ServerChat::mainLoop(){
 
                         flag = 1;
                         FD_SET(newfd,&listener);
+
                         // assign fdmax = socket of newfd
                         if( newfd > fdmax){
                             fdmax = newfd;
@@ -175,7 +191,7 @@ void ServerChat::mainLoop(){
                         const char * network_name = inet_ntop(remoteaddr.ss_family,
                                                               get_in_addr((struct sockaddr*)&remoteaddr)
                                                               ,remoteIP,INET6_ADDRSTRLEN);
-                        std::cout <<"new connection from" << network_name <<
+                        std::cout <<"\nnew connection from " << network_name <<
                                     " on socket" << newfd << "\n";
 
                         clientSocket = newfd;
@@ -201,6 +217,7 @@ void ServerChat::mainLoop(){
                         }
                         close(i);
                         FD_CLR(i,&listener);
+
                     }
 
                     //nhan duoc data -> xu li data
@@ -232,42 +249,67 @@ void ServerChat::mainLoop(){
 
                         handlMsg.unpacked_msg(recvMsg,buf,nbytes);
 
-                        if(recvMsg.type_msg == MSG || recvMsg.type_msg == PIG){
+                        if(recvMsg.type_msg == SGI){
                             rspMsg.ID = recvMsg.ID;
 
-                            std::cout<<"msg id :"<<recvMsg.ID<<"\n";
+                            //std::cout<<"msg id :"<<recvMsg.ID<<"\n";
+
+                            rspMsg.type_msg = RSP;
+                            rspMsg.msg = "";
+                            rspMsg.socketfd = i;
+                            clientQSend(rspMsg);
+                            //usleep(100);
+                            clientQRecv(recvMsg,client);
+                            if(skExist != -1){
+                                mtx.lock();
+                                close(skExist);
+                                FD_CLR(skExist,&listener);
+                                skExist = -1;
+                                mtx.unlock();
+
+                                //send(skExist,"close",5,0);
+                                //close(skExist);
+                            }
+
+                        }
+                        if(recvMsg.type_msg != RSP && recvMsg.type_msg != SGI){
+                            rspMsg.ID = recvMsg.ID;
+
+                            //std::cout<<"msg id :"<<recvMsg.ID<<"\n";
 
                             rspMsg.type_msg = RSP;
                             rspMsg.msg = "";
                             rspMsg.socketfd = i;
                             qSend.push(rspMsg);
                         }
+                        if(recvMsg.type_msg != SGI){
+                            qRecv.push(recvMsg);
+                        }
 
-                        qRecv.push(recvMsg);
                         delete[] buf;
                     }
                 }
             }
         }// end for
-        if(!qRecv.empty()){
+        while(!qRecv.empty()){
             struct msg_text qMsg;
             qMsg.ID = qRecv.front().ID;
             qMsg.msg = qRecv.front().msg;
             qMsg.type_msg = qRecv.front().type_msg;
             qMsg.socketfd = qRecv.front().socketfd;
 
-            pool.enqueue([qMsg,&client]{
+            pool.enqueue([&]{
                 clientQRecv(qMsg,client);
             });
             qRecv.pop();
         }
-        if(!qSend.empty()){
+        while(!qSend.empty()){
             struct msg_text qMsg;
             qMsg.ID = qSend.front().ID;
             qMsg.msg = qSend.front().msg;
             qMsg.type_msg = qSend.front().type_msg;
             qMsg.socketfd = qSend.front().socketfd;
-           // sleep(6); //test timeout
+            // sleep(6); //test timeout
             pool.enqueue([qMsg]{
                 clientQSend(qMsg);
             });
