@@ -42,21 +42,25 @@ int ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,
                     //infile.getline(a,1024);
 
                     //dong goi data
-                    struct msg_text msgSend;
-                    msgSend.type_msg = MSG;
+                    if(!line.empty()){
+                        struct msg_text msgSend;
+                        msgSend.type_msg = MSG;
 
-                    //msgSend.msg.assign(std::string(a,0,strlen(a)));
-                    msgSend.msg.assign(line);
-                    unsigned char buffer[msgSend.msg.length()+9];
-                    HandleMsg handleMsg;
-                    handleMsg.packed_msg(msgSend,buffer);
+                        //msgSend.msg.assign(std::string(a,0,strlen(a)));
+                        msgSend.msg.assign(line);
+                        unsigned char buffer[msgSend.msg.length()+9];
+                        HandleMsg handleMsg;
+                        handleMsg.packed_msg(msgSend,buffer);
 
-                    //qRecv.push(msgSend);
-                    usleep(1000);
-                    send(clientList[i].socketfd,buffer,sizeof(buffer),0);
+                        //qRecv.push(msgSend);
+                        usleep(1000);
+                        send(clientList[i].socketfd,buffer,sizeof(buffer),0);
 
 
-                    std::cout<<line<<"\n";
+                        std::cout<<line<<"\n";
+                    }
+
+
                     //std::cout<<std::string(a,0,1024)<<"\n";
                     //delete []a;
                 }
@@ -184,6 +188,7 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,char *ms
             }
             if(strcmp(clientList[i].name,nameClientSend) == 0){
                 if(clientList[i].status == true){
+                    usleep(100);
                     send(clientList[i].socketfd ,buffer,sizeof(buffer),0);
                     flag = true;
                 }

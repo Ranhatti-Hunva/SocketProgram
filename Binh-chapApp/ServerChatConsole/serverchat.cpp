@@ -258,7 +258,7 @@ void ServerChat::mainLoop(){
                             rspMsg.msg = "";
                             rspMsg.socketfd = i;
                             clientQSend(rspMsg);
-                            //usleep(100);
+                            usleep(1000);//1ms
                             clientQRecv(recvMsg,client);
                             if(skExist != -1){
                                 mtx.lock();

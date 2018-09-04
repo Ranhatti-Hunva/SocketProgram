@@ -28,7 +28,7 @@ void ClientChat::initClient(){
 
     if ((rv = getaddrinfo(m_svAddr, m_port, &hints, &servinfo)) != 0) {
         std::cerr<<"getaddrinfo: " << gai_strerror(rv) << "\n";
-        exit(1);
+        return;
     }
 }
 
@@ -44,7 +44,7 @@ int ClientChat::createSocket(){
         if(connect(sockfd,p->ai_addr,p->ai_addrlen) == -1){
             close(sockfd);
             perror("client: connect");
-            exit(1);
+            return -1;
         }
 
         break;
@@ -52,7 +52,7 @@ int ClientChat::createSocket(){
 
     if(p == nullptr){
         std :: cerr << "client failed to connect";
-        return 2;
+        return -2;
     }
 
     inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr),
@@ -85,7 +85,6 @@ int ClientChat::sendall(int socket,const char *buf, int len)
 }
 
 
-
 void ClientChat::mainLoop(){
 }
 
@@ -107,7 +106,7 @@ int  ClientChat::timeoutConnect(char *host,char* port, int timeout){
 
     if ((rv = getaddrinfo(host, port, &hints, &servinfo)) != 0) {
         std::cerr<<"getaddrinfo: " << gai_strerror(rv) << "\n";
-        exit(1);
+        return -1;
     }
 
     for( p = servinfo; p!= nullptr; p = p->ai_next){
@@ -117,17 +116,10 @@ int  ClientChat::timeoutConnect(char *host,char* port, int timeout){
             continue;
         }
 
-        long arg;
-        if( (arg = fcntl(sockfd, F_GETFL, NULL)) < 0) {
-            fprintf(stderr, "Error fcntl(..., F_GETFL) (%s)\n", strerror(errno));
-            exit(0);
-        }
+        long arg = fcntl(sockfd, F_GETFL, NULL);
         arg |= O_NONBLOCK;
-        if( fcntl(sockfd, F_SETFL, arg) < 0) {
-            fprintf(stderr, "Error fcntl(..., F_SETFL) (%s)\n", strerror(errno));
-            exit(0);
-        }
-        //        fcntl(sockfd, F_SETFL, O_NONBLOCK);
+        fcntl(sockfd, F_SETFL, arg);
+
         int connectStatus = connect(sockfd,p->ai_addr,p->ai_addrlen);
         if (connectStatus < 0) {
 
@@ -140,46 +132,43 @@ int  ClientChat::timeoutConnect(char *host,char* port, int timeout){
                     connectStatus = select(sockfd+1, nullptr, &Write, nullptr, &Timeout);
                     if (connectStatus < 0 && errno != EINTR) {
                         fprintf(stderr, "Error connecting %d - %s\n", errno, strerror(errno));
-                        exit(0);
+                        return -1;
                     }
                     else if (connectStatus > 0) {
                         // Socket selected for write
                         lon = sizeof(int);
                         if (getsockopt(sockfd, SOL_SOCKET, SO_ERROR, (void*)(&valopt), &lon) < 0) {
                             fprintf(stderr, "Error in getsockopt() %d - %s\n", errno, strerror(errno));
-                            exit(0);
+                            return -1;
                         }
                         // Check the value returned...
                         if (valopt) {
                             fprintf(stderr, "Error in delayed connection() %d - %s\n", valopt, strerror(valopt)
                                     );
-                            exit(0);
+                            return -1;
                         }
                         break;
                     }
                     else {
                         fprintf(stderr, "Timeout in select() - Cancelling!\n");
-                        exit(0);
+                        return -1;
                     }
                 } while (1);
             }
             else {
                 fprintf(stderr, "Error connecting %d - %s\n", errno, strerror(errno));
-                exit(0);
+                return -1;
             }
+
+            arg = fcntl(sockfd, F_GETFL, NULL);
+            arg &= (~O_NONBLOCK);
+            fcntl(sockfd, F_SETFL, arg);
+
+            return sockfd;
         }
 
-        arg = fcntl(sockfd, F_GETFL, NULL);
-        arg &= (~O_NONBLOCK);
-        fcntl(sockfd, F_SETFL, arg);
-
-        return sockfd;
     }
-
-
-
 }
-
 
 std::string ClientChat::getServerName(){
     return std::string(s,0,sizeof(s));
