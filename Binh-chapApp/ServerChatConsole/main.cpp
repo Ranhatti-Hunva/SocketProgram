@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <iostream>
 //-----------------------------------------------------------------------------
-#define HOST "localhost"
+#define HOST "10.42.0.127"
 #define PORT "8096"
 
 

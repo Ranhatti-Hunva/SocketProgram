@@ -4,6 +4,10 @@
 #include <chrono>
 #include <future>
 #include <queue>
+#include <iostream>     // std::cout
+#include <algorithm>    // std::find_if
+#include <vector>       // std::vector
+#include <memory>
 //----------------------------------------------------------------------------
 #define HOST "localhost"
 #define PORT "8096"
@@ -11,75 +15,28 @@
 //------------variable check---------------------------------------------------
 std::mutex mtx;
 int stop = 0;
-long int ms = 0;
 long int timeOut = 5000; //ms
 //std::chrono::milliseconds ms;
+
+//-----struct timeout ---------------------------------------------------------
+struct timeoutSend{
+    long int time;
+    msg_text msg;
+    int msgId;
+};
+
 //------------thread receive msg from server-----------------------------------
 
-void recvMsg(unsigned char *buf,int sockfd){
+void recvMsg(unsigned char *buf,int sockfd,std::vector<timeoutSend>&timeoutQ){
     long int timeRSP = 0;
     struct timeval tp;
     while(stop!=1){
 
-        if(ms >0){
-            gettimeofday(&tp, nullptr);
-            timeRSP = (tp.tv_sec * 1000 + tp.tv_usec / 1000)-ms;
-        }
-
-        if(timeRSP>timeOut){
-            std::cout<<"not recv rsp from server\n";
-            std::cout<<"time wait "<<timeRSP<<" ms\n";
-            std::cout<<"still wait 10 s if not recv rsp - close socket\n";
-            gettimeofday(&tp, nullptr);
-
-            long int time = tp.tv_sec * 1000 + tp.tv_usec;
-            // end_connection = true;
-            // resend msg
-            mtx.lock();
-            struct msg_text msg_ping;
-            struct msg_text msg_rsp;
-            HandleMsg handleMsg;
-            msg_ping.type_msg = PIG;
-            unsigned char buffer[10];
-            handleMsg.packed_msg(msg_ping,buffer);
-
-            send(sockfd,buffer,10,0);
-            unsigned char *buf1 = new unsigned char [100];
-            memset(buf1,0,100);
-            while(1){
-                if(time >0){
-                    gettimeofday(&tp, nullptr);
-                    timeRSP = (tp.tv_sec * 1000 + tp.tv_usec / 1000)-time;
-                }
-                if(timeRSP> timeOut*2){
-                    std::cout<<"not recv rsp from server - close socket\n";
-                    close(sockfd);
-                    exit(1);
-                }
-
-
-                int bytesRecv = recv(sockfd,buf1,100,0);
-                if(bytesRecv>0){
-                    handleMsg.unpacked_msg(msg_rsp,buf1,bytesRecv);
-                    if(msg_rsp.ID+1 == msg_ping.ID){
-                        timeRSP = 0;
-                        ms = 0;
-                        std::cout<<"continue chat\n>";
-                        break;
-                    }
-                }
-            }
-            mtx.unlock();
-        }
-
         buf = new unsigned char [2048];
         memset(buf,0,2048);
-        // mtx.lock();
-        int bytesRecv = recv(sockfd,buf,2048,0);
-        // mtx.unlock();
-        //mo goi
 
-        //if(std::strcmp(std::string(buf,0,4),"close")==0);
+        int bytesRecv = recv(sockfd,buf,2048,0);
+
 
         if(bytesRecv >0){
             struct msg_text msg_get;
@@ -93,13 +50,33 @@ void recvMsg(unsigned char *buf,int sockfd){
                 msg_rsp.ID = msg_get.ID;
                 msg_rsp.type_msg = RSP;
                 handleMsg.packed_msg(msg_rsp,buffer);
-                send(sockfd,buffer,10,0);
+                send(sockfd,buffer,9,0);
+                //std::vector<timeoutSend>::iterator it;
+
+
             }
 
             if(msg_get.type_msg == RSP){
-                timeRSP = 0;
-                ms = 0;
-                // std::cout << "id rps> " << msg_get.ID << std::endl;
+
+
+                //std::cout << "id rps> " << msg_get.ID << std::endl;
+                mtx.lock();
+                std::vector<timeoutSend>::iterator it;
+                // tim va xoa msg trong Q timeout khi nhan respond
+                if(!timeoutQ.empty()){
+                    //std::cout << "co vao\n";
+                    it = std::find_if(timeoutQ.begin(),timeoutQ.end(),
+                                      [=] (timeoutSend const& f) {
+                        return (f.msgId == msg_get.ID);
+                    });
+                    //std::cout<<"it "<<it.base()->msg.msg<<"\n";
+                    //tim thay va xoa
+                    if (it != timeoutQ.end()){
+                        timeoutQ.erase(it);
+                    }
+
+                }
+                mtx.unlock();
             }
             if(msg_get.msg.length() > 0)
                 std::cout << "> " << msg_get.msg << std::endl;
@@ -108,7 +85,8 @@ void recvMsg(unsigned char *buf,int sockfd){
             std::cout << "> server is close \n";
             close(sockfd);
             stop = 1;
-            exit(1);
+            break;
+            //exit(1);
         }
         if(stop != 0){
             break;
@@ -117,40 +95,150 @@ void recvMsg(unsigned char *buf,int sockfd){
     }
 
 }
-//-----struct
-struct timeoutSend{
-  long int time;
-  msg_text msg;
-  int msgId;
-};
 
 
-//-timeout thread------------------------------------------------------------------
+//----thread nhan tu console---------------------------------------------------------------------
+
+void cinFromConsole(int socket,std::queue<msg_text>&msgQ){
+    //int socket;std::queue<msg_text>msgQ;
+
+    msg_text msgSend;
 
 
-void timeoutThread(std::vector <timeoutSend> msgSendList){
-    while(1){
-        if(!msgSendList.empty()){
-            struct timeval tp;
-            gettimeofday(&tp, nullptr);
-            if((tp.tv_sec * 1000 + tp.tv_usec / 1000) - msgSendList.front().time > timeOut){
+    struct timeval tv;
+    tv.tv_sec = 0;
+    tv.tv_usec = 500000;
 
+    while(stop!=1){
+        fd_set read;
+        FD_ZERO(&read);
+        FD_SET(0,&read);
+        //select 1 cin ready to read input
+        if(select(1,&read,nullptr,nullptr,&tv) == -1){
+            perror("select :");
+        }
+        if(FD_ISSET(0,&read)){
+            std::string userInput;
+            getline(std::cin,userInput);
+            //std::cout<<"usr :"<<userInput<<"\n";
+            if(strcmp(userInput.c_str(),"#") == 0){
+                close(socket);
+                stop = 1;
+                userInput.clear();
+                break;
             }
-//            timeoutSend node;
-//            node.msgId = msgSend.ID;
-//            node.time = (tp.tv_sec * 1000 + tp.tv_usec / 1000);
-//            node.msg = msgSend;
-//            msgSendList.push_back(node);
+            else if(userInput.size() >0){
+
+                msgSend.type_msg = MSG;
+                msgSend.msg.assign(userInput);
+
+                mtx.lock();
+                msgQ.push(msgSend);
+                mtx.unlock();
+
+                userInput.clear();
+            }
         }
     }
 }
-//----thread nhan---------------------------------------------------------------------
+//------------thread send msg to server--------------------------------------------
+void sendMsg(int socket,std::queue<msg_text>&msgQ,std::vector<timeoutSend>&timeoutQ){
+    HandleMsg handleMsg;
+    struct timeval tp;
+    while(stop!=1){
+        if(!msgQ.empty()){
+            int buferSize = msgQ.front().msg.length()+9;
 
-void cinFromConsole(){
+            //unsigned char *buf = new unsigned char [buferSize];
+            std::unique_ptr <unsigned char> buf (new unsigned char [buferSize]);
+            handleMsg.packed_msg(msgQ.front(),buf.get());
+            if(send(socket,buf.get(),buferSize,0) > 0){
 
+                timeoutSend node;
+                node.msg = msgQ.front();
+                node.msgId = msgQ.front().ID;
+                gettimeofday(&tp, nullptr);
+                node.time = tp.tv_sec*1000 +tp.tv_usec/1000;
+                mtx.lock();
+                timeoutQ.push_back(node);
+                mtx.unlock();
+                msgQ.pop();
+            }
+            else{
+                perror("send: ");
+            }
+
+        }
+    }
+}
+//-----send ping-------------
+void sendPing(int socket){
+    HandleMsg handleMsg;
+    msg_text ping;
+    ping.type_msg = PIG;
+    std::unique_ptr <unsigned char> buf (new unsigned char [9]);
+    //unsigned char *buf = new unsigned char[9];
+    handleMsg.packed_msg(ping,buf.get());
+    send(socket,buf.get(),9,0);
+    //delete[]buf;
 }
 
+//------------thread timeout msg --------------------------------------------------
+void timeoutThread(int socket,std::vector<timeoutSend>&timeoutQ,std::queue<msg_text>&msgQ){
+    struct timeval tp;
+    HandleMsg handleMsg;
+    std::unique_ptr <unsigned char> buf (new unsigned char [9]);
+    //unsigned char *buf;
+    msg_text msgRecv;
+    while(stop != 1){
+        if(!timeoutQ.empty()){
+            gettimeofday(&tp, nullptr);
+            if((tp.tv_sec * 1000 + tp.tv_usec / 1000) - timeoutQ.front().time> timeOut){
+                std::cout<<"timeout!!!\n";
+                gettimeofday(&tp, nullptr);
+                long int timePing = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+                //ping and wait rsp from server
+                mtx.lock();
+                sendPing(socket);
+                usleep(100000);
+                while(1){
+                    gettimeofday(&tp, nullptr);
+                    if(tp.tv_sec * 1000 + tp.tv_usec / 1000 - timePing>timeOut*2){
+                        std::cout<<"can't connect to server\n";
+                        close(socket);
+                        stop = 1;
+                        break;
+                    }
+                    //buf = new unsigned char [9];
+                    int numRecv = recv(socket,buf.get(),9,0);
+                    if(numRecv > 0){
+                        handleMsg.unpacked_msg(msgRecv,buf.get(),numRecv);
+                        if(msgRecv.type_msg == RSP){
+                            // continue chat resend msg erease msg in timeoutQ
 
+                            //resend msg;
+                            msgQ.push(timeoutQ.front().msg);
+
+                            timeoutQ.erase(timeoutQ.begin());
+
+
+                            break;
+                        }
+                    }
+                    else if(numRecv == 0){
+                        close(socket);
+                        std::cout<<"server is close!!!\n";
+                        stop = 1;
+                        break;
+                    }                    
+
+                }
+                mtx.unlock();
+            }
+
+        }
+    }
+}
 
 //---------------------------------------------------------------------------------
 std::string getLineFromCin() {
@@ -159,19 +247,25 @@ std::string getLineFromCin() {
     return line;
 }
 //------------reconnect function---------------------------------------------------
-bool isReconnect(){
+bool isReconnect(std::vector<timeoutSend>&timeoutQ){
     std::string ans;
-
+    while(!timeoutQ.empty()){
+        std::cout <<"content " <<timeoutQ.back().msg.msg<<"\n";
+        std::cout <<"id " <<timeoutQ.back().msgId<<"\n";
+        std::cout <<"time " <<timeoutQ.back().time<<"\n";
+        timeoutQ.pop_back();
+    }
     while(1){
         std::cout << "Do you want reconnect to server ? (Y/N)\n";
-        //std::cin.ignore();
-        //ans = future.get();
+
         getline(std::cin,ans);
-        //std::cout<<ans<<"\n";
+
         if(ans.compare("Y") == 0){
+            std::cin.clear();
             return true;
         }
         else if(ans.compare("N") == 0){
+            std::cin.clear();
             return false;
         }
         else{
@@ -190,8 +284,8 @@ int main()
     unsigned char * bufrcv; // buf for recv data
     char statusBuf[10]; // buf status login
     std::string userInput;
-    std::vector <timeoutSend> msgSendList;
-    std:: queue <struct msg_text> qSend;
+    std::vector <timeoutSend> timeoutList;
+    std:: queue <msg_text> qSend;
     bool reconnect = true;
 
     while(reconnect){
@@ -235,38 +329,12 @@ int main()
                 memset(statusBuf,0,10);
                 int numRecv = recv(socket,statusBuf,10,0);
                 //mtx.lock();
-                //recv respond
+                //wait respond from server
                 if(numRecv >0){
                     std::cout << "Login success\n";
                     std::cout << "Start chat now" <<"\n";
                     std::cout  << "press '#' to exit\n";
                     break;
-                    //                }
-                    //std::cout<<"strcmp success "<<strcmp(statusBuf,"success")<<"\n";
-                    //std::cout<<"msg recv "<<std::string(statusBuf,0,10)<<"\n";
-                    //                    if(strcmp(statusBuf,"success") == 0){
-                    //                        std::cout << "Login success\n";
-                    //                        std::cout << "Start chat now" <<"\n";
-                    //                        std::cout  << "press '#' to exit\n";
-                    //                        usleep(1000);
-                    //                        break;
-                    //                    }
-                    //                    if(strcmp(statusBuf,"existed") == 0){
-                    //                        std::cout << "Username is existed please use another name\n>";
-
-                    //                        //std::cin.ignore();
-                    //                        getline(std::cin,name);
-                    //                        msgSend.msg.clear();
-                    //                        msgSend.msg.assign(name);
-                    //                        unsigned char nameResend[msgSend.msg.length()+9];
-                    //                        handleMsg.packed_msg(msgSend,nameResend);
-                    //                        send(socket,nameResend,sizeof(nameResend),0);
-                    //                    }
-                    //                    if(strcmp(statusBuf,"full") == 0){
-                    //                        std::cout << "server is full !!! can't login server\n";
-                    //                        close(socket);
-                    //                        return 1;
-                    //                    }
                 }
             }
 
@@ -275,12 +343,17 @@ int main()
 
 
             //thread receive msg
-            std::thread recvThread(recvMsg,bufrcv,socket);
 
+
+
+            std::thread cinConsoleThread(cinFromConsole,socket,ref(qSend));
+            std::thread sendMsgThread(sendMsg,socket,ref(qSend),ref(timeoutList));
+            std::thread recvThread(recvMsg,bufrcv,socket,ref(timeoutList));
+            std::thread timeoutThr(timeoutThread,socket,ref(timeoutList),ref(qSend));
             // main thread for send msg
             // press # for logout
             //auto future = std::async(std::launch::async, getLineFromCin);
-            while(1){
+            /*while(1){
 
                 getline(std::cin,userInput);
 
@@ -323,7 +396,7 @@ int main()
                     node.msgId = msgSend.ID;
                     node.time = (tp.tv_sec * 1000 + tp.tv_usec / 1000);
                     node.msg = msgSend;
-                    msgSendList.push_back(node);
+                    timeoutList.push_back(node);
 
 
                     mtx.unlock();
@@ -335,14 +408,17 @@ int main()
                     userInput.clear();
                 }
 
-            }
+            }*/
 
-            //stop thread recv before reconnect
+            //stop all thread before reconnect
+            sendMsgThread.join();
             recvThread.join();
+            cinConsoleThread.join();
+            timeoutThr.join();
 
         }
 
-        reconnect = isReconnect();
+        reconnect = isReconnect(ref(timeoutList));
 
     }
     return 0;

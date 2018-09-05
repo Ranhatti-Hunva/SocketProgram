@@ -11,4 +11,11 @@ struct clientNode{
     std:: queue <std::string> msg;
     int id;
 };
+
+struct timeoutNode{
+    int socket;
+    int msgID;
+    long int timeout;
+};
+
 #endif // CLIENTNODE_H
