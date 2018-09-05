@@ -11,13 +11,14 @@
 #include <stdio.h>
 #include <sys/socket.h>
 
+//#include "tcphelper.h"
+
 struct  client_information
 {
     char user_name[256];
     int socket_fd;    
     bool is_online;
 
-    // Save uncompleted buffer get from recv();
     std::vector<unsigned char> buffer;
 };
 
@@ -25,8 +26,8 @@ class client_list{
     std::vector <client_information> client_list;
     std::mutex client_mutext;
 
-//    int remove_by_order(unsigned long order);
 public:
+    std::mutex buffer_mutex;
     void add_fd(int fd_num);
     int set_user_name(int fd_num, const char* user_name);
 
@@ -39,8 +40,6 @@ public:
     void off_client(int fd_num);
 
     unsigned long size();
-
-//    int delete_fs_num(int fd_num);
 };
 
 #endif // CLIENTMANAGER_H

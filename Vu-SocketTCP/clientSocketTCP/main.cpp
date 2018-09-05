@@ -26,13 +26,14 @@ string user_name;
 int main()
 {
     /* Notice the program information */
-    printf("\n-------------**--------------\n\n");
+    printf("\n              -------------**--------------               \n\n");
     TCPclient client_helper; // Help client for any TCP process needed.
 
     /*------------------------------------------------------------------------------------------------------------*/
     // Searching server information. Change "" to specific host name if use remote server.
     struct addrinfo *server_infor, *p;
-    server_infor = client_helper.get_addinfo_list("10.42.0.194",1500);
+    server_infor = client_helper.get_addinfo_list("10.42.0.187",1500);
+//    server_infor = client_helper.get_addinfo_list("10.42.0.127",8096);
     p = server_infor;
 
     /*------------------------------------------------------------------------------------------------------------*/
@@ -51,7 +52,7 @@ int main()
 
         if(!user_name.compare("All"))
         {
-            printf("=> Sorry!! You can't use this name. Plz re-insert another username:\n");
+            printf("=> Sorry!! You can't use this name. Plz re-insert another username:");
         };
     };
 
@@ -73,14 +74,14 @@ int main()
 
         /*------------------------------------------------------------------------------------------------------------*/
         // Connection success and start to communication.
-        printf("\n=> Welcome!! Enter # to end the connection \n\n");
+        printf("=> Welcome!! Enter # to end the connection \n\n");
 
         msg_queue msg_wts;      // queue for the massages are wating to send.
         msg_wts.clear(Q_MSG);
         msg_wts.clear(Q_RSP);
 
         // Thread pool
-        thread_pool threads(10);
+        thread_pool threads(4);
 
         threads.enqueue(read_terminal, ref(end_connection), ref(client_helper), ref(msg_wts));
 
@@ -110,6 +111,6 @@ int main()
     /*------------------------------------------------------------------------------------------------------------*/
     /*----- Close the server socket and exit the program -----*/
     freeaddrinfo(server_infor);
-    printf("\n=> Socket is closed.\n=> Goodbye...\n");
+    printf("=> Socket is closed.\n=> Goodbye...\n");
     return 0;
 }

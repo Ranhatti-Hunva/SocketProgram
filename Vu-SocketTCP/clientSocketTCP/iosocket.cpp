@@ -30,38 +30,41 @@ void read_terminal(bool& end_connection, TCPclient& client_helper, msg_queue& ms
         general_tv.tv_sec = 0;
         general_tv.tv_usec = 5000;
 
-        select(1,&reader, nullptr, nullptr, &general_tv);
-        if (FD_ISSET(0, &reader))
+        int data = select(1,&reader, nullptr, nullptr, &general_tv);
+        if (data > 0)
         {
-            std::string user_cmd_str;
-            getline(std::cin, user_cmd_str);
-            if(!user_cmd_str.empty())
+            if (FD_ISSET(0, &reader))
             {
-                if(user_cmd_str.compare("#"))
+                std::string user_cmd_str;
+                getline(std::cin, user_cmd_str);
+                if(!user_cmd_str.empty())
                 {
-                    // Packet msg and push to msg_send_queue
-                    std::vector<std::string> container;
-                    splits_string(user_cmd_str, container);
-
-                    if(container.size() < 2)
+                    if(user_cmd_str.compare("#"))
                     {
-                        printf("=> Wrong format message or no massge to send !! \n");
+                        // Packet msg and push to msg_send_queue
+                        std::vector<std::string> container;
+                        splits_string(user_cmd_str, container);
+
+                        if(container.size() < 2)
+                        {
+                            printf("=> Wrong format message or no massge to send !! \n");
+                        }
+                        else
+                        {
+                            msg_text msg_send;
+                            msg_send.msg = user_cmd_str;
+                            msg_send.type_msg = MSG;
+
+                            std::vector<unsigned char> element;
+                            client_helper.packed_msg(msg_send, element);
+                            msg_wts.push(element, Q_MSG);
+                        };
                     }
                     else
                     {
-                        msg_text msg_send;
-                        msg_send.msg = user_cmd_str;
-                        msg_send.type_msg = MSG;
-
-                        std::vector<unsigned char> element;
-                        client_helper.packed_msg(msg_send, element);
-                        msg_wts.push(element, Q_MSG);
+                        end_connection = true;
+                        break;
                     };
-                }
-                else
-                {
-                    end_connection = true;
-                    break;
                 };
             };
         };
@@ -75,7 +78,7 @@ bool is_reconnect(int& client_fd)
     while (1)
     {
         close(client_fd);
-        printf("=> Do you want reconnect to server (Y/N)?\n");
+        printf("=> Do you want reconnect to server (Y/N): ");
         getline(std::cin, answer);
 
         if(!answer.compare("Y"))
@@ -88,7 +91,7 @@ bool is_reconnect(int& client_fd)
         }
         else
         {
-            printf("=> Don't understand the answer.\n");
+            printf("\n=> Don't understand the answer.\n");
             continue;
         }
     };

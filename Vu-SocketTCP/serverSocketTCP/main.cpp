@@ -25,6 +25,7 @@ using namespace std;
 
 int main()
 {
+    printf("\n              -------------**--------------               \n\n");
     // Create server echo socket on port 1500.
     TCPserver server_helper;
     int server_fd = server_helper.server_echo(1500);

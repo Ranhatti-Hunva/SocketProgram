@@ -2,8 +2,6 @@
 #include "iosocket.h"
 
 // TCPhelper contructor, menthod, .....
-//std::vector<TCPhelper::rps_timeout> TCPhelper::rps_timeout_list;
-
 void ultoc(unsigned int& ul, unsigned char* cu)
 {
     ul = 0;
@@ -52,7 +50,7 @@ struct addrinfo* TCPhelper::get_addinfo_list(std::string host_name, int port_num
     return infor_list;
 };
 
-bool TCPhelper::unpacked_msg(msg_text& msg_output, const std::vector<unsigned char> buffer)
+bool TCPhelper::unpacked_msg(msg_text& msg_output, std::vector<unsigned char>& buffer)
 {
     if(buffer.size() < 9)
     {
@@ -80,17 +78,22 @@ bool TCPhelper::unpacked_msg(msg_text& msg_output, const std::vector<unsigned ch
             {
                 msg_output.msg.clear();
 
-                for(unsigned long i=9; i<buffer.size(); i++)
+                for(unsigned long i=9; i<len_msg; i++)
                 {
                     msg_output.msg = msg_output.msg + static_cast<char>(buffer[i]);
                 };
             };
+
+            std::vector<unsigned char> buffer_remain(buffer.begin()+len_msg, buffer.end());
+            buffer.clear();
+            buffer = buffer_remain;
+
             return true;
         };
     };
 };
 
-bool TCPhelper::packed_msg(const msg_text msg_input, std::vector<unsigned char>& element)
+bool TCPhelper::packed_msg(msg_text& msg_input, std::vector<unsigned char>& element)
 {
     // Length msg
     unsigned long len = msg_input.msg.length()+9;
@@ -106,6 +109,7 @@ bool TCPhelper::packed_msg(const msg_text msg_input, std::vector<unsigned char>&
     if (msg_input.type_msg != RSP)
     {
         memcpy(ID_byte, &ID_msg, 4);
+        msg_input.ID = ID_msg;
     }
     else
     {
@@ -154,6 +158,9 @@ void TCPhelper::msg_confirm(const msg_text rsp)
     {
         if(rps_timeout_list[i].msg.ID == rsp.ID)
         {
+            std::chrono::duration<float> duration = std::chrono::system_clock::now() - rps_timeout_list[i].timeout;
+            printf("=> Get RSP for msg %d, respondre time: %f \n", rsp.ID, duration.count());
+
             rps_timeout_list.erase(rps_timeout_list.begin()+static_cast<long>(i));
             break;
         };
@@ -166,7 +173,7 @@ int TCPserver::server_echo(int port_num)
     int server_fd = -1;
     struct addrinfo *IP_list, *p;
 
-    IP_list = this->get_addinfo_list("10.42.0.194",port_num);
+    IP_list = this->get_addinfo_list("10.42.0.187",port_num);
     for(p = IP_list; p != nullptr; p = p->ai_next)
     {
         if ((server_fd = socket(p->ai_family, p->ai_socktype,p->ai_protocol)) == -1)
@@ -274,7 +281,7 @@ int TCPserver::recv_msg(int server_fd, client_list& client_socket_list, msg_queu
     };
 
     for (unsigned long i=0; i < this->client_fds.size(); i++)
-    {        
+    {
         if(FD_ISSET(this->client_fds[i], &read_fds))
         {
             const unsigned int bufsize = 1024;
@@ -302,7 +309,7 @@ int TCPserver::recv_msg(int server_fd, client_list& client_socket_list, msg_queu
             }
             else
             {
-                threads.enqueue([&, this, i]()
+                threads.enqueue([=, &client_socket_list, &msg_wts]()
                 {
                     this->process_on_buffer_recv(recv_buffer, num_data, client_socket_list, this->client_fds[i], msg_wts);
                 });
@@ -314,191 +321,186 @@ int TCPserver::recv_msg(int server_fd, client_list& client_socket_list, msg_queu
 
 void TCPserver::process_on_buffer_recv(const unsigned char buffer[],  const long num_data, client_list& client_socket_list, const int host_socket_fd, msg_queue& msg_wts)
 {
-    // Test file
-    printf("=> Process msg thread start! %d\n", host_socket_fd);
-
-    std::vector<unsigned char> buffer_test;
-    buffer_test.insert(buffer_test.end(), &buffer[0], &buffer[num_data]);
-
-    msg_text msg_test;
-    this->unpacked_msg(msg_test, buffer_test);
-
-    printf("   Type of msg from client: %d\n", static_cast<int>(msg_test.type_msg));
-    printf("   ID of msg from client: %d\n", static_cast<int>(msg_test.ID));
-    std::cout << "   MSG: " << msg_test.msg << std::endl;
-
     // Process
-    client_information* host_msg;
-    host_msg = client_socket_list.get_by_fd(host_socket_fd);
+    if (client_socket_list.is_online(host_socket_fd) > 0)
+    {
+        client_information* host_msg;
+        host_msg = client_socket_list.get_by_fd(host_socket_fd);
 
-    std::vector<unsigned char> buffer_all;
-    if(!host_msg->buffer.empty())
+        std::unique_lock<std::mutex> lock_buffer(client_socket_list.buffer_mutex);
+        std::vector<unsigned char> buffer_all;
         buffer_all = host_msg->buffer;
-    buffer_all.insert(buffer_all.end(), &buffer[0], &buffer[num_data]);
+        buffer_all.insert(buffer_all.end(), &buffer[0], &buffer[num_data]);
+        host_msg->buffer.clear();
 
-    msg_text msg_get;
-
-    bool is_msg_usable = this->unpacked_msg(msg_get, buffer_all);
-    host_msg->buffer.clear();
-
-    if (!is_msg_usable)
-    {
-        host_msg->buffer = buffer_all;
-    }
-    else
-    {
-        if(RSP == msg_get.type_msg)
+        while(buffer_all.size() > 0)
         {
-            printf("   Get RPS for message %d for socket %d \n", msg_get.ID, host_socket_fd);
-            this -> msg_confirm(msg_get);
-        }
-        else
-        {
-            // Push rsp
-            msg_text rsp;
-            rsp.type_msg = RSP;
-            rsp.ID = msg_get.ID;
-
-            q_element element;
-            element.socket_fd = host_socket_fd;
-            this -> packed_msg(rsp, element.content);
-            msg_wts.push(element, Q_RSP);
-
-            // Analyser msg got
-            switch(msg_get.type_msg)
+            msg_text msg_get;
+            bool is_msg_usable = this->unpacked_msg(msg_get, buffer_all);
+            if (!is_msg_usable)
             {
-                case PIG:
-                    std::cout << "   Message PING "<< static_cast<int>(msg_get.ID)<<" from client on socket: " << host_socket_fd << std::endl;
-                    break;
-                case SGI:
+                host_msg->buffer = buffer_all;
+//                lock_buffer.unlock();
+            }
+            else
+            {
+//                lock_buffer.unlock();
+                if(RSP == msg_get.type_msg)
                 {
-                    std::cout << "   Message LOGIN "<< static_cast<int>(msg_get.ID)<<" from client on socket " << host_socket_fd << ":" << msg_get.msg <<std::endl;
-                    int old_socket_fd = client_socket_list.set_user_name(host_socket_fd,msg_get.msg.c_str());
-                    if((old_socket_fd > 0) && (old_socket_fd != host_socket_fd))
+                    this -> msg_confirm(msg_get);
+                }
+                else
+                {
+                    // Push rsp
+                    msg_text rsp;
+                    rsp.type_msg = RSP;
+                    rsp.ID = msg_get.ID;
+
+                    q_element element;
+                    element.socket_fd = host_socket_fd;
+                    this -> packed_msg(rsp, element.content);
+                    msg_wts.push(element, Q_RSP);
+
+                    // Analyser msg got
+                    switch(msg_get.type_msg)
                     {
-                        std::unique_lock<std::mutex> locker(fd_set_mutex);
-                        FD_CLR(old_socket_fd, &master);
-                        close(old_socket_fd);
-                        for (unsigned long i=0; i < this->client_fds.size(); i++)
+                        case PIG:
                         {
-                            if (client_fds[i] == old_socket_fd)
-                            {
-                                client_fds.erase(client_fds.begin()+static_cast<long>(i));
-                            };
+                            std::cout << "=> Message PING - "<< static_cast<int>(msg_get.ID)<<" from client on socket: " << host_socket_fd << std::endl;
+                            break;
                         };
-                        locker.unlock();
-                    }
-                    else
-                    {
-                        // Get file msg and send to client.
-                        std::ifstream read_file;
-                        std::string nameof = "../build-serverSocketTCP-Desktop_Qt_5_11_1_clang_64bit-Debug/clientmsg/"+msg_get.msg+".txt";
-                        read_file.open(nameof);
-
-                        if (!read_file.fail())
+                        case SGI:
                         {
-                            msg_text msg_history;
-                            msg_history.type_msg = MSG;
-
-                            while(!read_file.eof())
+                            std::cout << "=> Message LOGIN - "<< static_cast<int>(msg_get.ID)<<" from client on socket " << host_socket_fd << ":" << msg_get.msg <<std::endl;
+                            int old_socket_fd = client_socket_list.set_user_name(host_socket_fd,msg_get.msg.c_str());
+                            if((old_socket_fd > 0) && (old_socket_fd != host_socket_fd))
                             {
-                                getline(read_file,msg_history.msg);
-                                if(!msg_history.msg.empty())
+                                std::unique_lock<std::mutex> locker(fd_set_mutex);
+                                FD_CLR(old_socket_fd, &master);
+                                close(old_socket_fd);
+                                for (unsigned long i=0; i < this->client_fds.size(); i++)
                                 {
-                                    q_element element;
-                                    element.socket_fd = host_socket_fd;
-                                    this -> packed_msg(msg_history, element.content);
-                                    msg_wts.push(element, Q_MSG);
+                                    if (client_fds[i] == old_socket_fd)
+                                    {
+                                        client_fds.erase(client_fds.begin()+static_cast<long>(i));
+                                    };
+                                };
+                                locker.unlock();
+                            }
+                            else
+                            {
+                                // Get file msg and send to client.
+                                std::ifstream read_file;
+                                std::string nameof = "../build-serverSocketTCP-Desktop_Qt_5_11_1_clang_64bit-Debug/clientmsg/"+msg_get.msg+".txt";
+                                read_file.open(nameof);
+
+                                if (!read_file.fail())
+                                {
+                                    msg_text msg_history;
+                                    msg_history.type_msg = MSG;
+
+                                    while(!read_file.eof())
+                                    {
+                                        getline(read_file,msg_history.msg);
+                                        if(!msg_history.msg.empty())
+                                        {
+                                            q_element element;
+                                            element.socket_fd = host_socket_fd;
+                                            this -> packed_msg(msg_history, element.content);
+                                            msg_wts.push(element, Q_MSG);
+                                            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                                        };
+                                    };
+                                    read_file.close();
+
+                                    if( remove( nameof.c_str() ) != 0 )
+                                        perror( "=> Error deleting file \n" );
+                                    else
+                                        printf( "=> File history successfully deleted \n" );
+                                }
+                                else
+                                {
+                                    printf("=> History msg of this client is clear!! \n");
+                                    read_file.close();
                                 };
                             };
-
-                            read_file.close();
-
-                            if( remove( nameof.c_str() ) != 0 )
-                                perror( "=> Error deleting file" );
-                            else
-                                printf( "=> File successfully deleted" );
-                        }
-                        else
-                        {
-                            printf("=> History msg of this client is clear!! \n");
-                            read_file.close();
+                            break;
                         };
-                    };
-                    break;
-                };
-                case MSG:
-                {
-                    std::cout << "   Message "<< static_cast<int>(msg_get.ID)<<" from client on socket " << host_socket_fd << ":" << msg_get.msg <<std::endl;
-
-                    std::vector<std::string> container;
-                    splits_string(msg_get.msg, container);
-
-                    msg_text msg_trasnsfer;
-                    msg_trasnsfer.type_msg = MSG;
-
-                    if(container[0].compare("All"))
-                    {
-                        // MSG: forward_user_name/msg;
-                        // Format message
-                        int forward_fd = client_socket_list.get_fd_by_user_name(container[0].c_str());
-                        forward_fd = client_socket_list.is_online(forward_fd);
-
-                        if (forward_fd < 0)
+                        case MSG:
                         {
-                            msg_trasnsfer.msg  = "Sorry,"+container[0]+" can't rely you right now!!";
+                            std::cout << "   Message "<< static_cast<int>(msg_get.ID)<<" from client on socket " << host_socket_fd << ":" << msg_get.msg <<std::endl;
 
-                            q_element element;
-                            element.socket_fd = host_socket_fd;
-                            this -> packed_msg(msg_trasnsfer, element.content);
-                            msg_wts.push(element, Q_MSG);
+                            std::vector<std::string> container;
+                            splits_string(msg_get.msg, container);
 
-                            // Save msg with file name is the name of forward user.
-                            std::ofstream write_file;
-                            std::string nameof = "../build-serverSocketTCP-Desktop_Qt_5_11_1_clang_64bit-Debug/clientmsg/"+container[0]+".txt";
-                            write_file.open(nameof, std::fstream::app);
+                            msg_text msg_trasnsfer;
+                            msg_trasnsfer.type_msg = MSG;
 
-                            std::string str(host_msg->user_name);
-
-                            write_file << str+">"+container[1]<< std::endl;
-
-                            write_file.close();
-                        }
-                        else
-                        {
-                            std::string str(host_msg->user_name);
-                            msg_trasnsfer.msg = str+">"+container[1];
-
-                            q_element element;
-                            element.socket_fd = forward_fd;
-                            this -> packed_msg(msg_trasnsfer, element.content);
-                            msg_wts.push(element, Q_MSG);
-                        };
-                    }
-                    else
-                    {
-                        std::string str(host_msg->user_name);
-                        msg_trasnsfer.msg = str+">"+container[1];
-
-                        for (unsigned long i=0; i< client_socket_list.size(); i++)
-                        {
-                            std::string message;
-                            client_information* forward_msg;
-                            forward_msg = client_socket_list.get_by_order(i);
-
-                            if(forward_msg->socket_fd != host_socket_fd)
+                            if(container[0].compare("All"))
                             {
-                                q_element element;
-                                element.socket_fd =  forward_msg->socket_fd;
-                                this -> packed_msg(msg_trasnsfer, element.content);
-                                msg_wts.push(element, Q_MSG);
+                                // MSG: forward_user_name/msg;
+                                // Format message
+                                int forward_fd = client_socket_list.get_fd_by_user_name(container[0].c_str());
+                                forward_fd = client_socket_list.is_online(forward_fd);
+
+                                if (forward_fd < 0)
+                                {
+                                    msg_trasnsfer.msg  = "Sorry,"+container[0]+" can't rely you right now!!";
+
+                                    q_element element;
+                                    element.socket_fd = host_socket_fd;
+                                    this -> packed_msg(msg_trasnsfer, element.content);
+                                    msg_wts.push(element, Q_MSG);
+
+                                    // Save msg with file name is the name of forward user.
+                                    std::ofstream write_file;
+                                    std::string nameof = "../build-serverSocketTCP-Desktop_Qt_5_11_1_clang_64bit-Debug/clientmsg/"+container[0]+".txt";
+                                    write_file.open(nameof, std::fstream::app);
+
+                                    std::string str(host_msg->user_name);
+
+                                    write_file << str+">"+container[1]<< std::endl;
+
+                                    write_file.close();
+                                }
+                                else
+                                {
+                                    std::string str(host_msg->user_name);
+                                    msg_trasnsfer.msg = str+">"+container[1];
+
+                                    q_element element;
+                                    element.socket_fd = forward_fd;
+                                    this -> packed_msg(msg_trasnsfer, element.content);
+                                    msg_wts.push(element, Q_MSG);
+                                };
+                            }
+                            else
+                            {
+                                std::string str(host_msg->user_name);
+                                msg_trasnsfer.msg = str+">"+container[1];
+
+                                for (unsigned long i=0; i< client_socket_list.size(); i++)
+                                {
+                                    std::string message;
+                                    client_information* forward_msg;
+                                    forward_msg = client_socket_list.get_by_order(i);
+
+                                    if(forward_msg->socket_fd != host_socket_fd)
+                                    {
+                                        q_element element;
+                                        element.socket_fd =  forward_msg->socket_fd;
+                                        this -> packed_msg(msg_trasnsfer, element.content);
+                                        msg_wts.push(element, Q_MSG);
+                                    };
+                                };
                             };
+                            break;
                         };
                     };
-                    break;
                 };
             };
         };
+        lock_buffer.unlock();
     };
 };
 
@@ -583,14 +585,9 @@ void TCPserver::send_msg(msg_queue& msg_wts, bool& end_connection, client_list& 
                 };
             };
 
-            msg_text msg_unpacked;
-            this->unpacked_msg(msg_unpacked, element.content);
-
             if(is_rsp)
             {
                 msg_wts.pop(Q_RSP);
-                printf("=> Send RSP for msg ID %d , on socket %d \n", msg_unpacked.ID, element.socket_fd);
-
             }
             else
             {
@@ -604,12 +601,14 @@ void TCPserver::send_msg(msg_queue& msg_wts, bool& end_connection, client_list& 
                 timepoint.timeout = std::chrono::system_clock::now();
                 timepoint.socket = element.socket_fd;
                 rps_timeout_list.push_back(timepoint);
+
+                cout<< "=> Send msg "<< msg_unpacked.ID << " on socket " << element.socket_fd <<" - content:" << msg_unpacked.msg << endl;
             }
         };
     };
 };
 
-void TCPserver::post_send_process(const q_element element, const bool is_rsp, msg_queue& msg_wts)
+void TCPserver::post_send_process(q_element element, const bool is_rsp, msg_queue& msg_wts)
 {
     printf("=> It's gool to run");
     if(is_rsp)

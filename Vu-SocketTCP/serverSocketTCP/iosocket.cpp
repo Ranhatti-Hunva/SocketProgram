@@ -22,67 +22,70 @@ void read_terminal(bool& end_connection, client_list& client_socket_list, TCPser
         FD_ZERO(&reader);
         FD_SET(0,&reader);
 
-        select(1,&reader, nullptr, nullptr, &server_helper.general_tv);
-        if (FD_ISSET(0, &reader))
+        int data = select(1,&reader, nullptr, nullptr, &server_helper.general_tv);
+        if (data > 0)
         {
-            std::string user_cmd_str;
-            getline(std::cin, user_cmd_str);
-            if(!user_cmd_str.empty())
+            if (FD_ISSET(0, &reader))
             {
-                if(user_cmd_str.compare("#"))
+                std::string user_cmd_str;
+                getline(std::cin, user_cmd_str);
+                if(!user_cmd_str.empty())
                 {
-                    // Packet msg and push to msg_send_queue
-                    std::vector<std::string> container;
-                    splits_string(user_cmd_str, container);
-
-                    if(container.size() < 2)
+                    if(user_cmd_str.compare("#"))
                     {
-                        printf("=> Wrong format message or no massge to send !! \n");
-                    }
-                    else
-                    {
-                        // Is part 1 of container is a number.                        
-                        // int client_socket = stoi(container[0]);
-                        // Searching client
-                        int client_socket = client_socket_list.get_fd_by_user_name(container[0].c_str());
-                        client_socket = client_socket_list.is_online(client_socket);
+                        // Packet msg and push to msg_send_queue
+                        std::vector<std::string> container;
+                        splits_string(user_cmd_str, container);
 
-                        if(client_socket < 0)
+                        if(container.size() < 2)
                         {
-                            printf("=> Sorry, %s is not online now!!. \n", container[0].c_str());
+                            printf("=> Wrong format message or no massge to send !! \n");
                         }
                         else
                         {
-                            std::string msg;
-                            unsigned long len_msg = user_cmd_str.length() - container[0].length()-1;
-                            unsigned long start_pos =  container[0].length()+1;
-                            msg = user_cmd_str.substr(start_pos, len_msg);
+                            // Is part 1 of container is a number.
+                            // int client_socket = stoi(container[0]);
+                            // Searching client
+                            int client_socket = client_socket_list.get_fd_by_user_name(container[0].c_str());
+                            client_socket = client_socket_list.is_online(client_socket);
 
-                            // Force close connection with client by server.
-                            if (!msg.compare("#"))
+                            if(client_socket < 0)
                             {
-                                server_helper.closer(client_socket,client_socket_list);
-                                printf("=> Closed connection with soket %d.\n",client_socket);
+                                printf("=> Sorry, %s is not online now!!. \n", container[0].c_str());
                             }
                             else
                             {
-                                // Packed msg and push to msg_queue
-                                msg_text msg_send;
-                                msg_send.msg = "Server >" + msg;
-                                msg_send.type_msg = MSG;
+                                std::string msg;
+                                unsigned long len_msg = user_cmd_str.length() - container[0].length()-1;
+                                unsigned long start_pos =  container[0].length()+1;
+                                msg = user_cmd_str.substr(start_pos, len_msg);
 
-                                q_element element;
-                                element.socket_fd = client_socket;
-                                server_helper.packed_msg(msg_send, element.content);
-                                msg_wts.push(element, MSG);
+                                // Force close connection with client by server.
+                                if (!msg.compare("#"))
+                                {
+                                    server_helper.closer(client_socket,client_socket_list);
+                                    printf("=> Closed connection with soket %d.\n",client_socket);
+                                }
+                                else
+                                {
+                                    // Packed msg and push to msg_queue
+                                    msg_text msg_send;
+                                    msg_send.msg = "Server >" + msg;
+                                    msg_send.type_msg = MSG;
+
+                                    q_element element;
+                                    element.socket_fd = client_socket;
+                                    server_helper.packed_msg(msg_send, element.content);
+                                    msg_wts.push(element, MSG);
+                                };
                             };
                         };
+                    }
+                    else
+                    {
+                        end_connection = true;
+                        break;
                     };
-                }
-                else
-                {
-                    end_connection = true;
-                    break;
                 };
             };
         };

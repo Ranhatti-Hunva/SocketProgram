@@ -28,6 +28,8 @@
 #define PIG 2
 #define RSP 3
 
+static std::mutex log_mutext;
+
 class TCPhelper
 {    
 protected:
@@ -36,7 +38,7 @@ protected:
 
     struct timeval general_tv;
 
-    const int timeout = 1;
+    const int timeout = 5;
 
 public:
     struct rps_timeout{
@@ -52,10 +54,10 @@ public:
     struct addrinfo* get_addinfo_list(std::string host_name, int port_num);
 
     // Packed msg ad format <2(char)><msg><3(char)> (2 is Start of Text, 3 is End of Text in ASCII).
-    bool packed_msg(const msg_text msg_input, std::vector<unsigned char>& element);
+    bool packed_msg(msg_text& msg_input, std::vector<unsigned char>& element);
 
     // Unpacked msg.
-    bool unpacked_msg(msg_text& msg_output, const std::vector<unsigned char> buffer);
+    bool unpacked_msg(msg_text& msg_output, std::vector<unsigned char>& buffer);
 
     // Get msg confirm
     void msg_confirm(const msg_text rsp);
@@ -64,6 +66,8 @@ public:
 class TCPclient: public TCPhelper{
 public:
     std::vector<unsigned char> buffer;
+    std::mutex ping_mutex;
+    std::condition_variable con_ping;
 
     bool ping;
     msg_text ping_msg;
@@ -72,7 +76,10 @@ public:
     {
         ping = false;
         rps_timeout_list.clear();
+        ping_msg.type_msg = PIG;
     }
+
+    std::mutex buffer_mutex;
 
     // Creat new socket and connect to a server with timeout. Let decision to re-connect on user.
     int connect_with_timeout(struct addrinfo *server_infor);
