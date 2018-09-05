@@ -4,6 +4,10 @@
 #include <chrono>
 #include <future>
 #include <queue>
+#include <iostream>     // std::cout
+#include <algorithm>    // std::find_if
+#include <vector>       // std::vector
+
 //----------------------------------------------------------------------------
 #define HOST "localhost"
 #define PORT "8096"
@@ -11,22 +15,29 @@
 //------------variable check---------------------------------------------------
 std::mutex mtx;
 int stop = 0;
-long int ms = 0;
 long int timeOut = 5000; //ms
 //std::chrono::milliseconds ms;
+
+//-----struct timeout ---------------------------------------------------------
+struct timeoutSend{
+    long int time;
+    msg_text msg;
+    int msgId;
+};
+
 //------------thread receive msg from server-----------------------------------
 
-void recvMsg(unsigned char *buf,int sockfd){
+void recvMsg(unsigned char *buf,int sockfd,std::vector<timeoutSend>&timeoutQ){
     long int timeRSP = 0;
     struct timeval tp;
     while(stop!=1){
 
-        if(ms >0){
-            gettimeofday(&tp, nullptr);
-            timeRSP = (tp.tv_sec * 1000 + tp.tv_usec / 1000)-ms;
-        }
+        //        if(ms >0){
+        //            gettimeofday(&tp, nullptr);
+        //            timeRSP = (tp.tv_sec * 1000 + tp.tv_usec / 1000)-ms;
+        //        }
 
-        if(timeRSP>timeOut){
+        /*if(timeRSP>timeOut){
             std::cout<<"not recv rsp from server\n";
             std::cout<<"time wait "<<timeRSP<<" ms\n";
             std::cout<<"still wait 10 s if not recv rsp - close socket\n";
@@ -70,7 +81,7 @@ void recvMsg(unsigned char *buf,int sockfd){
                 }
             }
             mtx.unlock();
-        }
+        }*/
 
         buf = new unsigned char [2048];
         memset(buf,0,2048);
@@ -91,12 +102,32 @@ void recvMsg(unsigned char *buf,int sockfd){
                 msg_rsp.type_msg = RSP;
                 handleMsg.packed_msg(msg_rsp,buffer);
                 send(sockfd,buffer,9,0);
+                //std::vector<timeoutSend>::iterator it;
+
+
             }
 
             if(msg_get.type_msg == RSP){
-                timeRSP = 0;
-                ms = 0;
-                std::cout << "id rps> " << msg_get.ID << std::endl;
+
+
+                //std::cout << "id rps> " << msg_get.ID << std::endl;
+                mtx.lock();
+                std::vector<timeoutSend>::iterator it;
+                // tim va xoa msg trong Q timeout khi nhan respond
+                if(!timeoutQ.empty()){
+                    //std::cout << "co vao\n";
+                    it = std::find_if(timeoutQ.begin(),timeoutQ.end(),
+                                      [=] (timeoutSend const& f) {
+                        return (f.msgId == msg_get.ID);
+                    });
+                    //std::cout<<"it "<<it.base()->msg.msg<<"\n";
+                    //tim thay va xoa
+                    if (it != timeoutQ.end()){
+                        timeoutQ.erase(it);
+                    }
+
+                }
+                mtx.unlock();
             }
             if(msg_get.msg.length() > 0)
                 std::cout << "> " << msg_get.msg << std::endl;
@@ -115,14 +146,6 @@ void recvMsg(unsigned char *buf,int sockfd){
     }
 
 }
-
-
-//-----struct
-struct timeoutSend{
-  long int time;
-  msg_text msg;
-  int msgId;
-};
 
 
 //----thread nhan tu console---------------------------------------------------------------------
@@ -148,7 +171,7 @@ void cinFromConsole(int socket,std::queue<msg_text>&msgQ){
         if(FD_ISSET(0,&read)){
             std::string userInput;
             getline(std::cin,userInput);
-            std::cout<<"usr :"<<userInput<<"\n";
+            //std::cout<<"usr :"<<userInput<<"\n";
             if(strcmp(userInput.c_str(),"#") == 0){
                 close(socket);
                 stop = 1;
@@ -209,7 +232,7 @@ void sendPing(int socket){
 }
 
 //------------thread timeout msg --------------------------------------------------
-void timeoutThread(int socket,std::vector<timeoutSend>&timeoutQ){
+void timeoutThread(int socket,std::vector<timeoutSend>&timeoutQ,std::queue<msg_text>&msgQ){
     struct timeval tp;
     HandleMsg handleMsg;
     unsigned char *buf;
@@ -224,6 +247,7 @@ void timeoutThread(int socket,std::vector<timeoutSend>&timeoutQ){
                 //ping and wait rsp from server
                 mtx.lock();
                 sendPing(socket);
+                usleep(100000);
                 while(1){
                     gettimeofday(&tp, nullptr);
                     if(tp.tv_sec * 1000 + tp.tv_usec / 1000 - timePing>timeOut*2){
@@ -237,7 +261,14 @@ void timeoutThread(int socket,std::vector<timeoutSend>&timeoutQ){
                     if(numRecv > 0){
                         handleMsg.unpacked_msg(msgRecv,buf,numRecv);
                         if(msgRecv.type_msg == RSP){
-                            // continue chat
+                            // continue chat resend msg erease msg in timeoutQ
+
+                            //resend msg;
+                            msgQ.push(timeoutQ.front().msg);
+
+                            timeoutQ.erase(timeoutQ.begin());
+
+
                             break;
                         }
                     }
@@ -246,12 +277,7 @@ void timeoutThread(int socket,std::vector<timeoutSend>&timeoutQ){
                         std::cout<<"server is close!!!\n";
                         stop = 1;
                         break;
-                    }
-                    else if(numRecv == -1){
-                        perror("recv: ");
-                        stop = 1;
-                        break;
-                    }
+                    }                    
 
                 }
                 mtx.unlock();
@@ -268,9 +294,14 @@ std::string getLineFromCin() {
     return line;
 }
 //------------reconnect function---------------------------------------------------
-bool isReconnect(){
+bool isReconnect(std::vector<timeoutSend>&timeoutQ){
     std::string ans;
-
+    while(!timeoutQ.empty()){
+        std::cout <<"content " <<timeoutQ.back().msg.msg<<"\n";
+        std::cout <<"id " <<timeoutQ.back().msgId<<"\n";
+        std::cout <<"time " <<timeoutQ.back().time<<"\n";
+        timeoutQ.pop_back();
+    }
     while(1){
         std::cout << "Do you want reconnect to server ? (Y/N)\n";
 
@@ -364,7 +395,8 @@ int main()
 
             std::thread cinConsoleThread(cinFromConsole,socket,ref(qSend));
             std::thread sendMsgThread(sendMsg,socket,ref(qSend),ref(timeoutList));
-            std::thread recvThread(recvMsg,bufrcv,socket);
+            std::thread recvThread(recvMsg,bufrcv,socket,ref(timeoutList));
+            std::thread timeoutThr(timeoutThread,socket,ref(timeoutList),ref(qSend));
             // main thread for send msg
             // press # for logout
             //auto future = std::async(std::launch::async, getLineFromCin);
@@ -429,10 +461,11 @@ int main()
             sendMsgThread.join();
             recvThread.join();
             cinConsoleThread.join();
+            timeoutThr.join();
 
         }
 
-        reconnect = isReconnect();
+        reconnect = isReconnect(ref(timeoutList));
 
     }
     return 0;

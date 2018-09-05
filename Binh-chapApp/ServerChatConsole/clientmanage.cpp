@@ -25,6 +25,16 @@ int ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,
             flagCheck = true;
             //send(socketfd,"success",7,0);
 
+            //check socket co mo hay ko truong hop timeout
+            int error_code;
+            socklen_t optlen = sizeof(error_code);
+
+            int res = getsockopt(clientList[i].socketfd, SOL_SOCKET, SO_ERROR, &error_code, &optlen);
+            //socket is open
+            if(error_code==0 && res == 0){
+                socketExist = clientList[i].socketfd;
+            }
+
             clientList[i].status = true;
             clientList[i].socketfd = socketfd;
             usleep(1000);
@@ -119,10 +129,15 @@ int ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,
 
 //send Msg To client
 
-void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,char *msg, int socketfd){
+void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
+                                   char *msg, int socketfd,
+                                   std::vector <timeoutNode> &timeoutList){
     //char nameClientSend[20];
     //char nameClientRecv[20];
     //char msgData[4096];
+
+    struct timeval tv;
+
     char * bufSend = new char [2048];
     memset(bufSend,0,2048);
     char *dataMsg = new char [strlen(msg)];
@@ -168,15 +183,23 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,char *ms
     handleMsg.packed_msg(msgSend,buffer);
 
     std::cout<<"\nnameClientSend : "<< std::string(nameClientSend,0,strlen(nameClientSend)) << "\n";
-    std::cout<<"strcmp all: "<<strcmp(nameClientSend,"all")<<"\n";
+    //std::cout<<"strcmp all: "<<strcmp(nameClientSend,"all")<<"\n";
 
 
     if(strcmp(nameClientSend,"all")==0){
         for(int i = 0; i < MAX_CLIENT ; i++){
             if(clientList[i].status == true && clientList[i].socketfd != socketfd){
-
+                flag = true;
                 // dong goi truoc khi send
                 send(clientList[i].socketfd ,buffer,sizeof(buffer),0);
+                //add Q timeout rsp
+                gettimeofday(&tv, nullptr);
+                timeoutNode to;
+                to.timeout = tv.tv_sec*1000 + tv.tv_usec/1000 ;
+                to.msgID = msgSend.ID;
+                to.socket = clientList[i].socketfd;
+                timeoutList.push_back(to);
+
             }
         }
     }
@@ -191,6 +214,12 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,char *ms
                     usleep(1000);
                     send(clientList[i].socketfd ,buffer,sizeof(buffer),0);
                     flag = true;
+                    gettimeofday(&tv, nullptr);
+                    timeoutNode to;
+                    to.timeout = tv.tv_sec*1000 + tv.tv_usec/1000 ;
+                    to.msgID = msgSend.ID;
+                    to.socket = clientList[i].socketfd;
+                    timeoutList.push_back(to);
                 }
                 else{
                     //store msg
@@ -214,9 +243,13 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,char *ms
                 break;
             }
         }
-        if(flag == false){
-            std::cout<< "client does not exist or wrong format\n";
-        }
+
+    }
+    if(flag == true){
+
+    }
+    if(flag == false){
+        std::cout<< "client does not exist or wrong format\n";
     }
     delete [] bufSend;
 
