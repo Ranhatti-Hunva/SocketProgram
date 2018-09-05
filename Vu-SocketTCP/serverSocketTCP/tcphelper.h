@@ -83,7 +83,7 @@ public:
     void process_on_buffer_recv(const unsigned char buffer[], const long num_data, client_list& client_socket_list, const int socket_fd, msg_queue& msg_wts);
 
     // Send packed message.
-    void send_msg(msg_queue& msg_wts, bool& end_connection, client_list& client_socket_list, thread_pool& threasds);
+    void send_msg(msg_queue& msg_wts, bool& end_connection, client_list& client_socket_list);
 
     // Post_sen_process;
     void post_send_process(q_element element, const bool is_rsp, msg_queue& msg_wts);

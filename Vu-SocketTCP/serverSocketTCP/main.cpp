@@ -49,7 +49,7 @@ int main()
 
     threads.enqueue([&]()
     {
-        server_helper.send_msg(msg_wts, end_connection, client_socket_list, threads);
+        server_helper.send_msg(msg_wts, end_connection, client_socket_list);
     });
 
     threads.enqueue([&]()

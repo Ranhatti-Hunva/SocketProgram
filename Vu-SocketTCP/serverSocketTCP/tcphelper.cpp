@@ -173,7 +173,7 @@ int TCPserver::server_echo(int port_num)
     int server_fd = -1;
     struct addrinfo *IP_list, *p;
 
-    IP_list = this->get_addinfo_list("10.42.0.187",port_num);
+    IP_list = this->get_addinfo_list("",port_num);
     for(p = IP_list; p != nullptr; p = p->ai_next)
     {
         if ((server_fd = socket(p->ai_family, p->ai_socktype,p->ai_protocol)) == -1)
@@ -504,7 +504,7 @@ void TCPserver::process_on_buffer_recv(const unsigned char buffer[],  const long
     };
 };
 
-void TCPserver::send_msg(msg_queue& msg_wts, bool& end_connection, client_list& client_socket_list, thread_pool& threads)
+void TCPserver::send_msg(msg_queue& msg_wts, bool& end_connection, client_list& client_socket_list)
 {
     while(!end_connection)
     {

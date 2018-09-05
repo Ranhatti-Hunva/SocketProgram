@@ -32,7 +32,7 @@ int main()
     /*------------------------------------------------------------------------------------------------------------*/
     // Searching server information. Change "" to specific host name if use remote server.
     struct addrinfo *server_infor, *p;
-    server_infor = client_helper.get_addinfo_list("10.42.0.187",1500);
+    server_infor = client_helper.get_addinfo_list("",1500);
 //    server_infor = client_helper.get_addinfo_list("10.42.0.127",8096);
     p = server_infor;
 
