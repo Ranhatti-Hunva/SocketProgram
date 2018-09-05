@@ -5,7 +5,7 @@
 #include <future>
 #include <queue>
 //----------------------------------------------------------------------------
-#define HOST "10.42.0.126"
+#define HOST "localhost"
 #define PORT "8096"
 #define TIME_OUT 10
 //------------variable check---------------------------------------------------
@@ -74,12 +74,9 @@ void recvMsg(unsigned char *buf,int sockfd){
 
         buf = new unsigned char [2048];
         memset(buf,0,2048);
-        // mtx.lock();
-        int bytesRecv = recv(sockfd,buf,2048,0);
-        // mtx.unlock();
-        //mo goi
 
-        //if(std::strcmp(std::string(buf,0,4),"close")==0);
+        int bytesRecv = recv(sockfd,buf,2048,0);
+
 
         if(bytesRecv >0){
             struct msg_text msg_get;
@@ -93,7 +90,7 @@ void recvMsg(unsigned char *buf,int sockfd){
                 msg_rsp.ID = msg_get.ID;
                 msg_rsp.type_msg = RSP;
                 handleMsg.packed_msg(msg_rsp,buffer);
-                send(sockfd,buffer,10,0);
+                send(sockfd,buffer,9,0);
             }
 
             if(msg_get.type_msg == RSP){
@@ -132,32 +129,44 @@ struct timeoutSend{
 
 void cinFromConsole(int socket,std::queue<msg_text>&msgQ){
     //int socket;std::queue<msg_text>msgQ;
-    std::string userInput;
+
     msg_text msgSend;
 
 
+    struct timeval tv;
+    tv.tv_sec = 0;
+    tv.tv_usec = 500000;
+
     while(stop!=1){
-
-        getline(std::cin,userInput);
-
-        if(strcmp(userInput.c_str(),"#") == 0){
-            close(socket);
-            stop = 1;
-            userInput.clear();
-            break;
+        fd_set read;
+        FD_ZERO(&read);
+        FD_SET(0,&read);
+        //select 1 cin ready to read input
+        if(select(1,&read,nullptr,nullptr,&tv) == -1){
+            perror("select :");
         }
-        else if(userInput.size() >0){
+        if(FD_ISSET(0,&read)){
+            std::string userInput;
+            getline(std::cin,userInput);
+            std::cout<<"usr :"<<userInput<<"\n";
+            if(strcmp(userInput.c_str(),"#") == 0){
+                close(socket);
+                stop = 1;
+                userInput.clear();
+                break;
+            }
+            else if(userInput.size() >0){
 
-            msgSend.type_msg = MSG;
-            msgSend.msg.assign(userInput);
+                msgSend.type_msg = MSG;
+                msgSend.msg.assign(userInput);
 
-            mtx.lock();
-            msgQ.push(msgSend);
-            mtx.unlock();
+                mtx.lock();
+                msgQ.push(msgSend);
+                mtx.unlock();
 
-            userInput.clear();
+                userInput.clear();
+            }
         }
-
     }
 }
 //------------thread send msg to server--------------------------------------------
@@ -264,15 +273,8 @@ bool isReconnect(){
 
     while(1){
         std::cout << "Do you want reconnect to server ? (Y/N)\n";
-        std::cin.sync();
-        std::cin.ignore('\0');
 
-//        //ans = future.get();
         getline(std::cin,ans);
-        getline(std::cin,ans);
-//        getline(std::cin,ans);
-        //std::cin>>ans;
-        std::cout<<ans<<"\n";
 
         if(ans.compare("Y") == 0){
             std::cin.clear();
@@ -423,11 +425,10 @@ int main()
 
             }*/
 
-            //stop thread recv before reconnect
+            //stop all thread before reconnect
             sendMsgThread.join();
             recvThread.join();
-            cinConsoleThread.detach();
-
+            cinConsoleThread.join();
 
         }
 

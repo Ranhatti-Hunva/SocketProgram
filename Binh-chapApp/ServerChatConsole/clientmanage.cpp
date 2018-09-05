@@ -139,7 +139,7 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,char *ms
 
     bool flag = false;
     for(int i = 0; i < MAX_CLIENT ; i++){
-        if(clientList[i].socketfd == socketfd){
+        if(clientList[i].socketfd == socketfd && clientList[i].status == true){
 
             if(strlen(nameClientSend)+1 < strlen(dataMsg)){
                 std::string msgData = std::string(dataMsg,0,strlen(dataMsg)).substr(strlen(nameClientSend)+1,strlen(dataMsg));
@@ -188,7 +188,7 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,char *ms
             }
             if(strcmp(clientList[i].name,nameClientSend) == 0){
                 if(clientList[i].status == true){
-                    usleep(100);
+                    usleep(1000);
                     send(clientList[i].socketfd ,buffer,sizeof(buffer),0);
                     flag = true;
                 }
