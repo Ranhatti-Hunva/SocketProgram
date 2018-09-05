@@ -197,6 +197,12 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
         HandleMsg handleMsg;
         handleMsg.packed_msg(msgSend,buffer);
 
+//        std::cout<<"send buf\n";
+//        for(int i = 0; i< msgSend.msg.length()+9;i++){
+//            std::cout<<(unsigned int)buffer[i]<<" ";
+//        }
+//        std::cout<<"\n";
+
         std::cout<<"\nnameClientSend : "<< std::string(nameClientSend,0,strlen(nameClientSend)) << "\n";
         //std::cout<<"strcmp all: "<<strcmp(nameClientSend,"all")<<"\n";
 

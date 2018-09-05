@@ -71,6 +71,7 @@ bool HandleMsg::packed_msg(struct msg_text& msg_input, unsigned char* buffer){
     return true;
 }
 
+/*
 bool HandleMsg::unpacked_msg(struct msg_text& msg_output, unsigned char* buffer, unsigned int num_data){
     if(num_data < 9)
     {
@@ -110,4 +111,51 @@ bool HandleMsg::unpacked_msg(struct msg_text& msg_output, unsigned char* buffer,
             return true;
         };
     };
+
+
+
 }
+*/
+
+bool HandleMsg::unpacked_msg(msg_text& msg_output, std::vector<unsigned char>& buffer)
+{
+    if(buffer.size() < 9)
+    {
+        // Shortest msg has 9 bytes in length.
+        return false;
+    }
+    else
+    {
+        unsigned int len_msg;
+        unsigned char len_msg_c[4] = {buffer[0],buffer[1],buffer[2],buffer[3]};
+        ultoc(len_msg,len_msg_c);
+
+        if(buffer.size() < len_msg)
+        {
+            return false;
+        }
+        else
+        {
+            msg_output.type_msg = buffer[4];
+
+            unsigned char ID_msg_c[4] = {buffer[5],buffer[6],buffer[7],buffer[8]};
+            ultoc(msg_output.ID,ID_msg_c);
+
+            if (msg_output.type_msg < 2)
+            {
+                msg_output.msg.clear();
+
+                for(unsigned long i=9; i<len_msg; i++)
+                {
+                    msg_output.msg = msg_output.msg + static_cast<char>(buffer[i]);
+                };
+            };
+
+            std::vector<unsigned char> buffer_remain(buffer.begin()+len_msg, buffer.end());
+            buffer.clear();
+            buffer = buffer_remain;
+
+            return true;
+        };
+    };
+};

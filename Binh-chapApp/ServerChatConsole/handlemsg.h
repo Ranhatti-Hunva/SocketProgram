@@ -25,11 +25,13 @@ struct msg_text
 
 class HandleMsg
 {
-public:
+public:    
     HandleMsg();
     void ultoc(unsigned int& ul, unsigned char* cu);
-    bool packed_msg(struct msg_text& msg_input, unsigned char* buffer);
+    bool packed_msg(struct msg_text& msg_input, unsigned char* buffer);    
     bool unpacked_msg(struct msg_text& msg_output, unsigned char* buffer, unsigned int num_data);
+
+
 };
 
 #endif // HANDLEMSG_H

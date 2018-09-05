@@ -9,7 +9,7 @@
 #include <vector>       // std::vector
 #include <memory>
 //----------------------------------------------------------------------------
-#define HOST "localhost"
+#define HOST "10.42.0.127"
 #define PORT "8096"
 #define TIME_OUT 10
 //------------variable check---------------------------------------------------
@@ -42,44 +42,65 @@ void recvMsg(unsigned char *buf,int sockfd,std::vector<timeoutSend>&timeoutQ){
             struct msg_text msg_get;
             struct msg_text msg_rsp;
             HandleMsg handleMsg;
-            bool is_success = handleMsg.unpacked_msg(msg_get, buf, bytesRecv);
-            // gui rsp to
 
-            if(is_success && msg_get.type_msg != RSP){
-                unsigned char buffer[10];
-                msg_rsp.ID = msg_get.ID;
-                msg_rsp.type_msg = RSP;
-                handleMsg.packed_msg(msg_rsp,buffer);
-                send(sockfd,buffer,9,0);
-                //std::vector<timeoutSend>::iterator it;
+            std::vector<unsigned char> buffer;
+            buffer.insert(buffer.end(),&buf[0],&buf[bytesRecv]);
 
+//            std::cout<<"recv \n";
+//            for(int i = 0; i< bytesRecv;i++){
+//                std::cout<<(unsigned int)buf[i]<<" ";
+//            }
 
-            }
+            //bool is_success = handleMsg.unpacked_msg(msg_get, buf, bytesRecv);
+            while(buffer.size()>0){
+                bool is_success = handleMsg.unpacked_msg(msg_get,buffer);
+                if(!is_success){
+                    break;
+                }
+                else{
+                    std::cout<<"\n";
+                    // gui rsp to
 
-            if(msg_get.type_msg == RSP){
+//                    if(is_success){
+//                        std::cout<<"id "<<msg_get.ID<<" type "<<(int)msg_get.type_msg
+//                                <<" content "<<msg_get.msg<<"\n";
+//                    }
+                    if(is_success && msg_get.type_msg != RSP){
+                        unsigned char buffer[10];
+                        msg_rsp.ID = msg_get.ID;
+                        msg_rsp.type_msg = RSP;
+                        handleMsg.packed_msg(msg_rsp,buffer);
+                        send(sockfd,buffer,9,0);
+                        //std::vector<timeoutSend>::iterator it;
+                    }
+                    if(msg_get.type_msg == RSP){
+                        //std::cout << "id rps> " << msg_get.ID << std::endl;
 
+                        mtx.lock();
+                        std::vector<timeoutSend>::iterator it;
+                        // tim va xoa msg trong Q timeout khi nhan respond
+                        if(!timeoutQ.empty()){
+                            //std::cout << "co vao\n";
+                            it = std::find_if(timeoutQ.begin(),timeoutQ.end(),
+                                              [=] (timeoutSend const& f) {
+                                return (f.msgId == msg_get.ID);
+                            });
+                            //std::cout<<"it "<<it.base()->msg.msg<<"\n";
+                            //tim thay va xoa
+                            if (it != timeoutQ.end()){
+                                timeoutQ.erase(it);
+                            }
 
-                //std::cout << "id rps> " << msg_get.ID << std::endl;
-                mtx.lock();
-                std::vector<timeoutSend>::iterator it;
-                // tim va xoa msg trong Q timeout khi nhan respond
-                if(!timeoutQ.empty()){
-                    //std::cout << "co vao\n";
-                    it = std::find_if(timeoutQ.begin(),timeoutQ.end(),
-                                      [=] (timeoutSend const& f) {
-                        return (f.msgId == msg_get.ID);
-                    });
-                    //std::cout<<"it "<<it.base()->msg.msg<<"\n";
-                    //tim thay va xoa
-                    if (it != timeoutQ.end()){
-                        timeoutQ.erase(it);
+                        }
+                        mtx.unlock();
+                    }
+                    if(msg_get.msg.length() > 0){
+                        std::cout << "> " << msg_get.msg << std::endl;
                     }
 
                 }
-                mtx.unlock();
             }
-            if(msg_get.msg.length() > 0)
-                std::cout << "> " << msg_get.msg << std::endl;
+
         }
         if(bytesRecv == 0){
             std::cout << "> server is close \n";
@@ -93,6 +114,7 @@ void recvMsg(unsigned char *buf,int sockfd,std::vector<timeoutSend>&timeoutQ){
         }
         delete[] buf;
     }
+
 
 }
 
@@ -152,6 +174,13 @@ void sendMsg(int socket,std::queue<msg_text>&msgQ,std::vector<timeoutSend>&timeo
             //unsigned char *buf = new unsigned char [buferSize];
             std::unique_ptr <unsigned char> buf (new unsigned char [buferSize]);
             handleMsg.packed_msg(msgQ.front(),buf.get());
+
+//            std::cout<<"send buf\n";
+//            for(int i = 0; i< buferSize;i++){
+//                std::cout<<(unsigned int)buf.get()[i]<<" ";
+//            }
+//            std::cout<<"\n";
+
             if(send(socket,buf.get(),buferSize,0) > 0){
 
                 timeoutSend node;
@@ -212,25 +241,37 @@ void timeoutThread(int socket,std::vector<timeoutSend>&timeoutQ,std::queue<msg_t
                     //buf = new unsigned char [9];
                     int numRecv = recv(socket,buf.get(),9,0);
                     if(numRecv > 0){
-                        handleMsg.unpacked_msg(msgRecv,buf.get(),numRecv);
-                        if(msgRecv.type_msg == RSP){
-                            // continue chat resend msg erease msg in timeoutQ
 
-                            //resend msg;
-                            msgQ.push(timeoutQ.front().msg);
+                        std::vector<unsigned char> buffer;
+                        buffer.insert(buffer.end(),&buf.get()[0],&buf.get()[numRecv]);
+                        while(buffer.size()>0){
+                            bool is_success = handleMsg.unpacked_msg(msgRecv,buffer);
+                            if(!is_success){
+                                break;
+                            }
+                            else{
+                                if(msgRecv.type_msg == RSP){
+                                    // continue chat resend msg erease msg in timeoutQ
 
-                            timeoutQ.erase(timeoutQ.begin());
+                                    //resend msg;
+                                    msgQ.push(timeoutQ.front().msg);
+
+                                    timeoutQ.erase(timeoutQ.begin());
 
 
-                            break;
+                                    break;
+                                }
+                            }
                         }
+                        //handleMsg.unpacked_msg(msgRecv,buf.get(),numRecv);
+
                     }
                     else if(numRecv == 0){
                         close(socket);
                         std::cout<<"server is close!!!\n";
                         stop = 1;
                         break;
-                    }                    
+                    }
 
                 }
                 mtx.unlock();

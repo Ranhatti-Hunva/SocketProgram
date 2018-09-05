@@ -296,8 +296,17 @@ void ServerChat::mainLoop(){
                         recvMsg.msg ="";
                         recvMsg.type_msg = -1;
                         recvMsg.socketfd = i;
-
-                        handlMsg.unpacked_msg(recvMsg,buf.get(),nbytes);
+//                        std::cout<<"recv \n";
+                        bool is_success = handlMsg.unpacked_msg(recvMsg,buf.get(),nbytes);
+//                        for(int i = 0; i< nbytes;i++){
+//                            std::cout<<(unsigned int)buf.get()[i]<<" ";
+//                        }
+//                        std::cout<<"\n";
+//                        //std::cout<<(unsigned int)buf.get()<<"\n";
+//                        if(is_success){
+//                            std::cout<<"id "<<recvMsg.ID<<" type "<<(int)recvMsg.type_msg
+//                                    <<" content "<<recvMsg.msg<<"\n";
+//                        }
 
                         if(recvMsg.type_msg == SGI){
                             rspMsg.ID = recvMsg.ID;
