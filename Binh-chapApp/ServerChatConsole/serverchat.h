@@ -28,8 +28,8 @@
 #include "clientnode.h"
 #include "threadpool.h"
 
-#define BACKLOG 10
-#define MAX_CLIENT 10
+#define BACKLOG 50
+//#define MAX_CLIENT 50
 
 
 //-----struct Modify------------------------------------------------------------

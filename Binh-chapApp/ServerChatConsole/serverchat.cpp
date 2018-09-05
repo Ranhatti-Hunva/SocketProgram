@@ -70,13 +70,18 @@ void ServerChat::clientQRecv(struct msg_text msgHandle,
                              std::vector <clientNode> &clientList,
                              std::vector <timeoutNode> &timeoutList){
     ClientManage cliManage;
-    char *msgbuf = new char[msgHandle.msg.size()];
-    strcpy(msgbuf,msgHandle.msg.c_str());
+
+    std::unique_ptr<char> msgbuf(new char[msgHandle.msg.size()]);
+
+    //char *msgbuf = new char[msgHandle.msg.size()];
+
+
+    strcpy(msgbuf.get(),msgHandle.msg.c_str());
     //std::cout<<"msg :"<<msgHandle.msg<<"\n";
 
     switch(msgHandle.type_msg){
     case SGI:
-        skExist = cliManage.mapClientWithSocket(clientList,msgHandle.socketfd,msgbuf,qRecv);
+        skExist = cliManage.mapClientWithSocket(clientList,msgHandle.socketfd,msgbuf.get(),listener);
 
         for(int i = 0 ; i < MAX_CLIENT ; i++){
             if(clientList[i].status == true){
@@ -89,7 +94,7 @@ void ServerChat::clientQRecv(struct msg_text msgHandle,
         break;
 
     case MSG:
-        cliManage.sendMsgToClient(clientList,msgbuf,msgHandle.socketfd,timeoutList);
+        cliManage.sendMsgToClient(clientList,msgbuf.get(),msgHandle.socketfd,timeoutList);
         //add Q time out wait for rsp
         //std::cout<<"id msg bf send: " <<msgHandle.ID<< " from socket "<<msgHandle.socketfd <<"\n";
         break;
@@ -112,7 +117,7 @@ void ServerChat::clientQRecv(struct msg_text msgHandle,
         //find and erase msg in timeout list
         break;
     }
-    delete [] msgbuf;
+    //delete [] msgbuf;
 }
 // thread time for time out ---------------------------------------------------
 void ServerChat::timeoutThread(fd_set &fd,
@@ -124,7 +129,7 @@ void ServerChat::timeoutThread(fd_set &fd,
 
             gettimeofday(&tp, nullptr);
             if((tp.tv_sec * 1000 + tp.tv_usec / 1000) - timeoutList.front().timeout> timeOut){
-                std::cout << "co vao hehe\n";
+                //std::cout << "co vao hehe\n";
                 std::cout<<"client timeout!!!\n";
                 //close clear from fd off client;
                 for(int i = 0; i<MAX_CLIENT;i++){
@@ -144,12 +149,8 @@ void ServerChat::timeoutThread(fd_set &fd,
 //-----------------------------------------------------------------------------
 //send respond
 void clientQSend(struct msg_text msgHandle/*, std::vector <clientNode> &clientList*/){
-    //    ClientManage cliManage;
-    //    char *msgbuf = new char(msgHandle.msg.size());
-    //    strcpy(msgbuf,msgHandle.msg.c_str());
 
     HandleMsg grapMsg;
-
 
     switch(msgHandle.type_msg){
     case RSP:
@@ -216,7 +217,7 @@ void ServerChat::mainLoop(){
         }
 
 
-        for(int i = 0; i<= fdmax; i++){
+        for(int i = sockfd; i<= fdmax; i++){
 
             if(FD_ISSET(i,&read_fds)){
 
@@ -247,9 +248,10 @@ void ServerChat::mainLoop(){
                 } else {
                     // handling data from client
                     // khong nhan duoc data tu clien -> dong ket noi client
-                    unsigned char *buf = new unsigned char[2048];
-                    memset(buf,0,2048);
-                    if((nbytes = recv(i,buf,2048,0))<=0){
+                    std::unique_ptr<unsigned char> buf (new unsigned char[2048]);
+                    //unsigned char *buf = new unsigned char[2048];
+                    memset(buf.get(),0,2048);
+                    if((nbytes = recv(i,buf.get(),2048,0))<=0){
                         if(nbytes == 0){
                             // close connect
                             // chuyen trang thai stt sang offline
@@ -295,7 +297,7 @@ void ServerChat::mainLoop(){
                         recvMsg.type_msg = -1;
                         recvMsg.socketfd = i;
 
-                        handlMsg.unpacked_msg(recvMsg,buf,nbytes);
+                        handlMsg.unpacked_msg(recvMsg,buf.get(),nbytes);
 
                         if(recvMsg.type_msg == SGI){
                             rspMsg.ID = recvMsg.ID;
@@ -338,7 +340,7 @@ void ServerChat::mainLoop(){
                             qRecv.push(recvMsg);
                         }
 
-                        delete[] buf;
+                        //delete[] buf;
                     }
                 }
             }

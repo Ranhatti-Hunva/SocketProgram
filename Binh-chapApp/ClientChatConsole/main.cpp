@@ -7,7 +7,7 @@
 #include <iostream>     // std::cout
 #include <algorithm>    // std::find_if
 #include <vector>       // std::vector
-
+#include <memory>
 //----------------------------------------------------------------------------
 #define HOST "localhost"
 #define PORT "8096"
@@ -31,57 +31,6 @@ void recvMsg(unsigned char *buf,int sockfd,std::vector<timeoutSend>&timeoutQ){
     long int timeRSP = 0;
     struct timeval tp;
     while(stop!=1){
-
-        //        if(ms >0){
-        //            gettimeofday(&tp, nullptr);
-        //            timeRSP = (tp.tv_sec * 1000 + tp.tv_usec / 1000)-ms;
-        //        }
-
-        /*if(timeRSP>timeOut){
-            std::cout<<"not recv rsp from server\n";
-            std::cout<<"time wait "<<timeRSP<<" ms\n";
-            std::cout<<"still wait 10 s if not recv rsp - close socket\n";
-            gettimeofday(&tp, nullptr);
-
-            long int time = tp.tv_sec * 1000 + tp.tv_usec;
-            // end_connection = true;
-            // resend msg
-            mtx.lock();
-            struct msg_text msg_ping;
-            struct msg_text msg_rsp;
-            HandleMsg handleMsg;
-            msg_ping.type_msg = PIG;
-            unsigned char buffer[10];
-            handleMsg.packed_msg(msg_ping,buffer);
-
-            send(sockfd,buffer,10,0);
-            unsigned char *buf1 = new unsigned char [100];
-            memset(buf1,0,100);
-            while(1){
-                if(time >0){
-                    gettimeofday(&tp, nullptr);
-                    timeRSP = (tp.tv_sec * 1000 + tp.tv_usec / 1000)-time;
-                }
-                if(timeRSP> timeOut*2){
-                    std::cout<<"not recv rsp from server - close socket\n";
-                    close(sockfd);
-                    exit(1);
-                }
-
-
-                int bytesRecv = recv(sockfd,buf1,100,0);
-                if(bytesRecv>0){
-                    handleMsg.unpacked_msg(msg_rsp,buf1,bytesRecv);
-                    if(msg_rsp.ID+1 == msg_ping.ID){
-                        timeRSP = 0;
-                        ms = 0;
-                        std::cout<<"continue chat\n>";
-                        break;
-                    }
-                }
-            }
-            mtx.unlock();
-        }*/
 
         buf = new unsigned char [2048];
         memset(buf,0,2048);
@@ -199,9 +148,11 @@ void sendMsg(int socket,std::queue<msg_text>&msgQ,std::vector<timeoutSend>&timeo
     while(stop!=1){
         if(!msgQ.empty()){
             int buferSize = msgQ.front().msg.length()+9;
-            unsigned char *buf = new unsigned char [buferSize];
-            handleMsg.packed_msg(msgQ.front(),buf);
-            if(send(socket,buf,buferSize,0) > 0){
+
+            //unsigned char *buf = new unsigned char [buferSize];
+            std::unique_ptr <unsigned char> buf (new unsigned char [buferSize]);
+            handleMsg.packed_msg(msgQ.front(),buf.get());
+            if(send(socket,buf.get(),buferSize,0) > 0){
 
                 timeoutSend node;
                 node.msg = msgQ.front();
@@ -225,17 +176,19 @@ void sendPing(int socket){
     HandleMsg handleMsg;
     msg_text ping;
     ping.type_msg = PIG;
-    unsigned char *buf = new unsigned char[9];
-    handleMsg.packed_msg(ping,buf);
-    send(socket,buf,9,0);
-    delete[]buf;
+    std::unique_ptr <unsigned char> buf (new unsigned char [9]);
+    //unsigned char *buf = new unsigned char[9];
+    handleMsg.packed_msg(ping,buf.get());
+    send(socket,buf.get(),9,0);
+    //delete[]buf;
 }
 
 //------------thread timeout msg --------------------------------------------------
 void timeoutThread(int socket,std::vector<timeoutSend>&timeoutQ,std::queue<msg_text>&msgQ){
     struct timeval tp;
     HandleMsg handleMsg;
-    unsigned char *buf;
+    std::unique_ptr <unsigned char> buf (new unsigned char [9]);
+    //unsigned char *buf;
     msg_text msgRecv;
     while(stop != 1){
         if(!timeoutQ.empty()){
@@ -256,10 +209,10 @@ void timeoutThread(int socket,std::vector<timeoutSend>&timeoutQ,std::queue<msg_t
                         stop = 1;
                         break;
                     }
-                    buf = new unsigned char [9];
-                    int numRecv = recv(socket,buf,9,0);
+                    //buf = new unsigned char [9];
+                    int numRecv = recv(socket,buf.get(),9,0);
                     if(numRecv > 0){
-                        handleMsg.unpacked_msg(msgRecv,buf,numRecv);
+                        handleMsg.unpacked_msg(msgRecv,buf.get(),numRecv);
                         if(msgRecv.type_msg == RSP){
                             // continue chat resend msg erease msg in timeoutQ
 

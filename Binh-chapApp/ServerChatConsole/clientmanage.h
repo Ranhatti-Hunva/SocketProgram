@@ -19,14 +19,16 @@
 #include <errno.h>
 #include <stdlib.h>
 
-#define MAX_CLIENT 10
+#include <memory>
+
+#define MAX_CLIENT 50
 
 class ClientManage
 {
 public:
     ClientManage();
     int mapClientWithSocket(std::vector <clientNode> &clientList,
-                            int socketfd, char * buf, std::queue<msg_text> &qRecv);
+                            int socketfd, char * buf, fd_set &fds);
     void sendMsgToClient(std::vector <clientNode> &clientList, char *msg, int socketfd, std::vector<timeoutNode> &timeoutList);
 };
 
