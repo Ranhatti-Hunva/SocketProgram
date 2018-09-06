@@ -160,9 +160,9 @@ int  ClientChat::timeoutConnect(char *host,char* port, int timeout){
                 return -1;
             }
 
-            arg = fcntl(sockfd, F_GETFL, NULL);
-            arg &= (~O_NONBLOCK);
-            fcntl(sockfd, F_SETFL, arg);
+//            arg = fcntl(sockfd, F_GETFL, NULL);
+//            arg &= (~O_NONBLOCK);
+//            fcntl(sockfd, F_SETFL, arg);
 
             return sockfd;
         }

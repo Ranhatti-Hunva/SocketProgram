@@ -9,7 +9,7 @@
 #include <vector>       // std::vector
 #include <memory>
 //----------------------------------------------------------------------------
-#define HOST "10.42.0.127"
+#define HOST "10.42.0.128"
 #define PORT "8096"
 #define TIME_OUT 10
 //------------variable check---------------------------------------------------
@@ -17,7 +17,7 @@ std::mutex mtx;
 int stop = 0;
 long int timeOut = 5000; //ms
 //std::chrono::milliseconds ms;
-
+int loginId = -1;
 //-----struct timeout ---------------------------------------------------------
 struct timeoutSend{
     long int time;
@@ -46,10 +46,10 @@ void recvMsg(unsigned char *buf,int sockfd,std::vector<timeoutSend>&timeoutQ){
             std::vector<unsigned char> buffer;
             buffer.insert(buffer.end(),&buf[0],&buf[bytesRecv]);
 
-//            std::cout<<"recv \n";
-//            for(int i = 0; i< bytesRecv;i++){
-//                std::cout<<(unsigned int)buf[i]<<" ";
-//            }
+            //            std::cout<<"recv \n";
+            //            for(int i = 0; i< bytesRecv;i++){
+            //                std::cout<<(unsigned int)buf[i]<<" ";
+            //            }
 
             //bool is_success = handleMsg.unpacked_msg(msg_get, buf, bytesRecv);
             while(buffer.size()>0){
@@ -58,13 +58,22 @@ void recvMsg(unsigned char *buf,int sockfd,std::vector<timeoutSend>&timeoutQ){
                     break;
                 }
                 else{
-                    std::cout<<"\n";
+                    //std::cout<<"\n";
                     // gui rsp to
 
-//                    if(is_success){
-//                        std::cout<<"id "<<msg_get.ID<<" type "<<(int)msg_get.type_msg
-//                                <<" content "<<msg_get.msg<<"\n";
-//                    }
+                    //                    if(is_success){
+                    //                        std::cout<<"id "<<msg_get.ID<<" type "<<(int)msg_get.type_msg
+                    //                                <<" content "<<msg_get.msg<<"\n";
+                    //                    }
+
+                    if(is_success && msg_get.type_msg == RSP && msg_get.ID == loginId){
+
+                        std::cout << "Login success\n";
+                        std::cout << "Start chat now" <<"\n";
+                        std::cout  << "press '#' to exit\n";
+
+                    }
+
                     if(is_success && msg_get.type_msg != RSP){
                         unsigned char buffer[10];
                         msg_rsp.ID = msg_get.ID;
@@ -175,11 +184,11 @@ void sendMsg(int socket,std::queue<msg_text>&msgQ,std::vector<timeoutSend>&timeo
             std::unique_ptr <unsigned char> buf (new unsigned char [buferSize]);
             handleMsg.packed_msg(msgQ.front(),buf.get());
 
-//            std::cout<<"send buf\n";
-//            for(int i = 0; i< buferSize;i++){
-//                std::cout<<(unsigned int)buf.get()[i]<<" ";
-//            }
-//            std::cout<<"\n";
+            //            std::cout<<"send buf\n";
+            //            for(int i = 0; i< buferSize;i++){
+            //                std::cout<<(unsigned int)buf.get()[i]<<" ";
+            //            }
+            //            std::cout<<"\n";
 
             if(send(socket,buf.get(),buferSize,0) > 0){
 
@@ -364,20 +373,20 @@ int main()
         if(socket > 0){
             //send name user to server for login
             int num = send(socket,buffer,sizeof(buffer),0);
-
+            loginId = msgSend.ID;
             //check valid username
-            while(1){
-                memset(statusBuf,0,10);
-                int numRecv = recv(socket,statusBuf,10,0);
-                //mtx.lock();
-                //wait respond from server
-                if(numRecv >0){
-                    std::cout << "Login success\n";
-                    std::cout << "Start chat now" <<"\n";
-                    std::cout  << "press '#' to exit\n";
-                    break;
-                }
-            }
+            //            while(1){
+            //                memset(statusBuf,0,10);
+            //                int numRecv = recv(socket,statusBuf,10,0);
+            //                //mtx.lock();
+            //                //wait respond from server
+            //                if(numRecv >0){
+            //                    std::cout << "Login success\n";
+            //                    std::cout << "Start chat now" <<"\n";
+            //                    std::cout  << "press '#' to exit\n";
+            //                    break;
+            //                }
+            //            }
 
             //socket non-blocking mode
             fcntl(socket, F_SETFL, O_NONBLOCK);
