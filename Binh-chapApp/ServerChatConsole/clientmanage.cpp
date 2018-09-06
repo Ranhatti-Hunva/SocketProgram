@@ -229,204 +229,161 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
                                    char *msg, int socketfd,
                                    std::vector <timeoutNode> &timeoutList){
 
-    if(msg != nullptr){
-        struct timeval tv;
-        //std::unique_ptr<char>a(new char[10]);
-        std::unique_ptr<char> bufSend (new char[2048]);
-        //char * bufSend = new char [2048];
-        memset(bufSend.get(),0,2048);
 
-        std::unique_ptr<char> dataMsg (new char(strlen(msg)));
-        //char *dataMsg = new char [strlen(msg)];
-        strcpy(dataMsg.get(),msg);
-        char *nameClientSend = std::strtok(msg,"/");
+    struct timeval tv;
+    //std::unique_ptr<char>a(new char[10]);
+    //std::unique_ptr<char> bufSend (new char[2048]);
+    char * bufSend = new char [2048];
+    memset(bufSend,0,2048);
 
-        std::cout<<"\nnameClientSend : "<< std::string(nameClientSend,0,strlen(nameClientSend)) << "\n";
+    //std::unique_ptr<char> dataMsg (new char(strlen(msg)));
+
+    //std::cout<<"str len "<<strlen(msg)<<"\n";
+    char *dataMsg = new char [strlen(msg)];
+    strcpy(dataMsg,msg);
+    char *nameClientSend = std::strtok(msg,"/");
+
+    std::cout<<"\nnameClientSend : "<< std::string(nameClientSend,0,strlen(nameClientSend)) << "\n";
 
 
-        bool flag = false;
+    bool flag = false;
 
 
-        std::map<std::string,int> mapClient;
-        std::map<std::string,int>::iterator it;
+    std::map<std::string,int> mapClient;
+    std::map<std::string,int>::iterator it;
 
-        for(int i = 0; i< MAX_CLIENT; i++){
-            if(clientList[i].id != -1){
-                mapClient.insert(std::pair<std::string,int>(clientList[i].name,clientList[i].id));
-            }
+    for(int i = 0; i< MAX_CLIENT; i++){
+        if(clientList[i].id != -1){
+            mapClient.insert(std::pair<std::string,int>(clientList[i].name,clientList[i].id));
         }
+    }
 
-        //        it = mapClient.find(nameClientSend);
-        //        //tim thay ten nguoi muon gui trong list
-        //        if (it != mapClient.end()){
-        //            int posClient = it->second;
-        //            if(strlen(nameClientSend)+1 <= strlen(dataMsg.get())){
-        //                //get name of client send msg
-        //                std::string msgData = std::string(dataMsg.get(),0,strlen(dataMsg.get()))
-        //                        .substr(strlen(nameClientSend)+1,strlen(dataMsg.get()));
+    //        it = mapClient.find(nameClientSend);
+    //        //tim thay ten nguoi muon gui trong list
+    //        if (it != mapClient.end()){
+    //            int posClient = it->second;
+    //            if(strlen(nameClientSend)+1 <= strlen(dataMsg.get())){
+    //                //get name of client send msg
+    //                std::string msgData = std::string(dataMsg.get(),0,strlen(dataMsg.get()))
+    //                        .substr(strlen(nameClientSend)+1,strlen(dataMsg.get()));
 
-        //                std::cout<<"\ndata msg: "<< msgData << "\n";
+    //                std::cout<<"\ndata msg: "<< msgData << "\n";
 
-        //                strcat(bufSend.get(),clientList[posClient].name);
-        //                strcat(bufSend.get(),": ");
-        //                strcat(bufSend.get(),msgData.c_str());
-        //            }
-        //        }
-        //        else{
-        //            std::cout<<"\nwrong format\n";
-        //        }
+    //                strcat(bufSend.get(),clientList[posClient].name);
+    //                strcat(bufSend.get(),": ");
+    //                strcat(bufSend.get(),msgData.c_str());
+    //            }
+    //        }
+    //        else{
+    //            std::cout<<"\nwrong format\n";
+    //        }
 
 
-        //assign ten ng gui
+    //assign ten ng gui
+    for(int i = 0; i < MAX_CLIENT ; i++){
+        if(clientList[i].socketfd == socketfd && clientList[i].status == true){
+
+            if(strlen(nameClientSend)+1 < strlen(dataMsg)){
+                //get name of client send msg
+                std::string msgData = std::string(dataMsg,0,strlen(dataMsg))
+                        .substr(strlen(nameClientSend)+1,strlen(dataMsg));
+
+                std::cout<<"\ndata msg: "<< msgData << "\n";
+
+                strcat(bufSend,clientList[i].name);
+                strcat(bufSend,": ");
+                strcat(bufSend,msgData.c_str());
+            }
+            else{
+                std::cout<<"\nwrong format\n";
+            }
+
+            break;
+        }
+    }
+    //delete [] dataMsg;
+
+
+    //dong goi data
+   struct msg_text msgSend;
+    msgSend.type_msg = MSG;
+
+    msgSend.msg.assign(std::string(bufSend,0,strlen(bufSend)));
+
+    unsigned char buffer[msgSend.msg.length()+9];
+    HandleMsg handleMsg;
+    handleMsg.packed_msg(msgSend,buffer);
+
+    //        std::cout<<"send buf\n";
+    //        for(int i = 0; i< msgSend.msg.length()+9;i++){
+    //            std::cout<<(unsigned int)buffer[i]<<" ";
+    //        }
+    //        std::cout<<"\n";
+
+    std::cout<<"\nnameClientSend : "<< std::string(nameClientSend,0,strlen(nameClientSend)) << "\n";
+    //std::cout<<"strcmp all: "<<strcmp(nameClientSend,"all")<<"\n";
+
+
+    if(strcmp(nameClientSend,"all")==0){
         for(int i = 0; i < MAX_CLIENT ; i++){
-            if(clientList[i].socketfd == socketfd && clientList[i].status == true){
+            if(clientList[i].status == true && clientList[i].socketfd != socketfd){
+                flag = true;
+                // dong goi truoc khi send
+                send(clientList[i].socketfd ,buffer,sizeof(buffer),0);
+                //add Q timeout rsp
+                gettimeofday(&tv, nullptr);
+                timeoutNode to;
+                to.timeout = tv.tv_sec*1000 + tv.tv_usec/1000 ;
+                to.msgID = msgSend.ID;
+                to.socket = clientList[i].socketfd;
+                timeoutList.push_back(to);
 
-                if(strlen(nameClientSend)+1 <= strlen(dataMsg.get())){
-                    //get name of client send msg
-                    std::string msgData = std::string(dataMsg.get(),0,strlen(dataMsg.get()))
-                            .substr(strlen(nameClientSend)+1,strlen(dataMsg.get()));
-
-                    std::cout<<"\ndata msg: "<< msgData << "\n";
-
-                    strcat(bufSend.get(),clientList[i].name);
-                    strcat(bufSend.get(),": ");
-                    strcat(bufSend.get(),msgData.c_str());
-                }
-                else{
-                    std::cout<<"\nwrong format\n";
-                }
-
-                break;
             }
         }
-        //delete [] dataMsg;
-
-
-        //dong goi data
-        struct msg_text msgSend;
-        msgSend.type_msg = MSG;
-
-        msgSend.msg.assign(std::string(bufSend.get(),0,strlen(bufSend.get())));
-
-        unsigned char buffer[msgSend.msg.length()+9];
-        HandleMsg handleMsg;
-        handleMsg.packed_msg(msgSend,buffer);
-
-        //        std::cout<<"send buf\n";
-        //        for(int i = 0; i< msgSend.msg.length()+9;i++){
-        //            std::cout<<(unsigned int)buffer[i]<<" ";
-        //        }
-        //        std::cout<<"\n";
-
-        std::cout<<"\nnameClientSend : "<< std::string(nameClientSend,0,strlen(nameClientSend)) << "\n";
-        //std::cout<<"strcmp all: "<<strcmp(nameClientSend,"all")<<"\n";
-
-
-        if(strcmp(nameClientSend,"all")==0){
-            for(int i = 0; i < MAX_CLIENT ; i++){
-                if(clientList[i].status == true && clientList[i].socketfd != socketfd){
-                    flag = true;
-                    // dong goi truoc khi send
-                    send(clientList[i].socketfd ,buffer,sizeof(buffer),0);
-                    //add Q timeout rsp
-                    gettimeofday(&tv, nullptr);
-                    timeoutNode to;
-                    to.timeout = tv.tv_sec*1000 + tv.tv_usec/1000 ;
-                    to.msgID = msgSend.ID;
-                    to.socket = clientList[i].socketfd;
-                    timeoutList.push_back(to);
-
-                }
+    }
+    else{
+        it = mapClient.find(nameClientSend);
+        if (it != mapClient.end()){
+            int posClient = it->second;
+            //std::cout<<"pos "<<posClient<<"\n";
+            if(clientList[posClient].status == true){
+                //dam bao rsp se gui truoc msg trong truong hop client gui msg cho chinh no
+                usleep(1000);
+                send(clientList[posClient].socketfd ,buffer,sizeof(buffer),0);
+                flag = true;
+                gettimeofday(&tv, nullptr);
+                timeoutNode to;
+                to.timeout = tv.tv_sec*1000 + tv.tv_usec/1000 ;
+                to.msgID = msgSend.ID;
+                to.socket = clientList[posClient].socketfd;
+                timeoutList.push_back(to);
+            }
+            else{
+                std::ofstream outfile;
+                char * filename = new char[strlen(clientList[posClient].name)];
+                strcpy(filename,clientList[posClient].name);
+                outfile.open(strcat(filename,".txt"),std::ios::out | std::ios::app);
+                time_t     now;
+                struct tm  ts;
+                char       buf[80];
+                // Get current time
+                time(&now);
+                // Format time, "ddd yyyy-mm-dd hh:mm:ss zzz"
+                ts = *localtime(&now);
+                strftime(buf, sizeof(buf), "%a %Y-%m-%d %H:%M:%S", &ts);
+                outfile << bufSend <<" --- "<< buf <<std::endl;
+                outfile.close();
+                std::cout<< "xxxxxxxxxxxxx\n";
+                flag = true;
             }
         }
         else{
-            it = mapClient.find(nameClientSend);
-            if (it != mapClient.end()){
-                int posClient = it->second;
-                if(clientList[posClient].status == true){
-                    //dam bao rsp se gui truoc msg trong truong hop client gui msg cho chinh no
-                    usleep(10000);
-                    send(clientList[posClient].socketfd ,buffer,sizeof(buffer),0);
-                    flag = true;
-                    gettimeofday(&tv, nullptr);
-                    timeoutNode to;
-                    to.timeout = tv.tv_sec*1000 + tv.tv_usec/1000 ;
-                    to.msgID = msgSend.ID;
-                    to.socket = clientList[posClient].socketfd;
-                    timeoutList.push_back(to);
-                }
-                else{
-                    std::ofstream outfile;
-                    char * filename = new char[strlen(clientList[posClient].name)];
-                    strcpy(filename,clientList[posClient].name);
-                    outfile.open(strcat(filename,".txt"),std::ios::out | std::ios::app);
-                    time_t     now;
-                    struct tm  ts;
-                    char       buf[80];
-                    // Get current time
-                    time(&now);
-                    // Format time, "ddd yyyy-mm-dd hh:mm:ss zzz"
-                    ts = *localtime(&now);
-                    strftime(buf, sizeof(buf), "%a %Y-%m-%d %H:%M:%S", &ts);
-                    outfile << bufSend.get() <<" --- "<< buf <<std::endl;
-                    outfile.close();
-                    std::cout<< "xxxxxxxxxxxxx\n";
-                    flag = true;
-                }
-            }
-            else{
-                std::cout<< "client does not exist or wrong format\n";
-            }
-
-            /*
-            for(int i = 0; i < MAX_CLIENT ; i++){
-                if(clientList[i].id != -1 && clientList[i].status == false){
-                    std::cout<<std::string(clientList[i].name,0,20)<<" off\n";
-                    //std::cout<<"str cmp : "<<strcmp(clientList[i].name,nameClientSend)<<"\n";
-                }
-                if(strcmp(clientList[i].name,nameClientSend) == 0){
-                    if(clientList[i].status == true){
-                        //dam bao rsp se gui truoc msg trong truong hop client gui msg cho chinh no
-                        usleep(10000);
-                        send(clientList[i].socketfd ,buffer,sizeof(buffer),0);
-                        flag = true;
-                        gettimeofday(&tv, nullptr);
-                        timeoutNode to;
-                        to.timeout = tv.tv_sec*1000 + tv.tv_usec/1000 ;
-                        to.msgID = msgSend.ID;
-                        to.socket = clientList[i].socketfd;
-                        timeoutList.push_back(to);
-                    }
-                    else{
-                        //store msg
-                        std::ofstream outfile;
-                        char * filename = new char[strlen(clientList[i].name)];
-                        strcpy(filename,clientList[i].name);
-                        outfile.open(strcat(filename,".txt"),std::ios::out | std::ios::app);
-                        time_t     now;
-                        struct tm  ts;
-                        char       buf[80];
-                        // Get current time
-                        time(&now);
-                        // Format time, "ddd yyyy-mm-dd hh:mm:ss zzz"
-                        ts = *localtime(&now);
-                        strftime(buf, sizeof(buf), "%a %Y-%m-%d %H:%M:%S", &ts);
-                        outfile << bufSend.get() <<" --- "<< buf <<std::endl;
-                        outfile.close();
-                        std::cout<< "xxxxxxxxxxxxx\n";
-                        flag = true;
-                    }
-                    break;
-                }
-            }*/
-
+            std::cout<< "client does not exist or wrong format\n";
         }
 
-//        if(flag == false){
-//            std::cout<< "client does not exist or wrong format\n";
-//        }
-        //delete [] bufSend;
     }
+    delete [] dataMsg;
+    delete [] bufSend;
 
 }
 

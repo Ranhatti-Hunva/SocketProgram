@@ -71,17 +71,18 @@ void ServerChat::clientQRecv(struct msg_text msgHandle,
                              std::vector <timeoutNode> &timeoutList){
     ClientManage cliManage;
 
-    std::unique_ptr<char> msgbuf(new char[msgHandle.msg.size()]);
+    //std::unique_ptr<char> msgbuf(new char[2048]);
+//    std::cout<<"68 id "<<msgHandle.ID << " type "<<(int)msgHandle.type_msg
+//            <<" msg "<<msgHandle.msg<<"\n";
+    char *msgbuf = new char[msgHandle.msg.size()];
 
-    //char *msgbuf = new char[msgHandle.msg.size()];
 
-
-    strcpy(msgbuf.get(),msgHandle.msg.c_str());
+    strcpy(msgbuf,msgHandle.msg.c_str());
     //std::cout<<"msg :"<<msgHandle.msg<<"\n";
 
     switch(msgHandle.type_msg){
     case SGI:
-        skExist = cliManage.mapClientWithSocket(clientList,msgHandle.socketfd,msgbuf.get(),listener);
+        skExist = cliManage.mapClientWithSocket(clientList,msgHandle.socketfd,msgbuf,listener);
 
         for(int i = 0 ; i < MAX_CLIENT ; i++){
             if(clientList[i].status == true){
@@ -94,7 +95,8 @@ void ServerChat::clientQRecv(struct msg_text msgHandle,
         break;
 
     case MSG:
-        cliManage.sendMsgToClient(clientList,msgbuf.get(),msgHandle.socketfd,timeoutList);
+        //std::cout<<
+        cliManage.sendMsgToClient(clientList,msgbuf,msgHandle.socketfd,timeoutList);
         //add Q time out wait for rsp
         //std::cout<<"id msg bf send: " <<msgHandle.ID<< " from socket "<<msgHandle.socketfd <<"\n";
         break;
@@ -291,11 +293,7 @@ void ServerChat::mainLoop(){
                            truyen tung nguoi hoac truyen tat ca
                            send -> deQmsg
                         */
-                        struct msg_text recvMsg,rspMsg;
-                        recvMsg.ID = 0;
-                        recvMsg.msg ="";
-                        recvMsg.type_msg = -1;
-                        recvMsg.socketfd = i;
+
 //                        std::cout<<"recv \n";
 
 
@@ -303,13 +301,24 @@ void ServerChat::mainLoop(){
 
                         std::vector<unsigned char> buffer;
                         buffer.insert(buffer.end(),&buf.get()[0],&buf.get()[nbytes]);
+                        //std::cout <<"nhan " << nbytes <<"\n";
 
                         while(buffer.size()>0){
+                            msg_text recvMsg,rspMsg;
+                            //recvMsg.ID = 0;
+                            //recvMsg.msg.clear();
+                            //recvMsg.type_msg = -1;
+                            recvMsg.socketfd = i;
                             bool is_success = handlMsg.unpacked_msg(recvMsg,buffer);
+
+//                            std::cout<<"1 id "<<recvMsg.ID << " type "<<(int)recvMsg.type_msg
+//                                    <<" msg "<<recvMsg.msg<<"\n";
+
                             if(!is_success){
                                 break;
                             }
                             else{
+
                                 if(recvMsg.type_msg == SGI){
                                     rspMsg.ID = recvMsg.ID;
 
@@ -348,6 +357,8 @@ void ServerChat::mainLoop(){
                                 }
                                 if(recvMsg.type_msg != SGI){
                                     qRecv.push(recvMsg);
+//                                    std::cout<<"2 id "<<recvMsg.ID << " type "<<(int)recvMsg.type_msg
+//                                            <<" msg "<<recvMsg.msg<<"\n";
                                 }
 
                                 //delete[] buf;
@@ -364,9 +375,19 @@ void ServerChat::mainLoop(){
             qMsg.type_msg = qRecv.front().type_msg;
             qMsg.socketfd = qRecv.front().socketfd;
 
-            pool.enqueue([&]{
+//            std::cout<<"4 id "<<qRecv.front().ID << " type "<<(int)qRecv.front().type_msg
+//                    <<" msg "<<qRecv.front().msg<<"\n";
+
+            pool.enqueue([&,qMsg]{
+//                std::cout<<"59 id "<<qMsg.ID << " type "<<(int)qMsg.type_msg
+//                        <<" msg "<<qMsg.msg<<"\n";
                 clientQRecv(qMsg,client,timeoutList);
+//                std::cout<<"6 id "<<qMsg.ID << " type "<<(int)qMsg.type_msg
+//                        <<" msg "<<qMsg.msg<<"\n";
             });
+
+//            std::cout<<"5 id "<<qMsg.ID << " type "<<(int)qMsg.type_msg
+//                    <<" msg "<<qMsg.msg<<"\n";
             qRecv.pop();
         }
         while(!qSend.empty()){

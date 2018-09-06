@@ -9,8 +9,8 @@
 #include <vector>       // std::vector
 #include <memory>
 //----------------------------------------------------------------------------
-#define HOST "10.42.0.128"
-#define PORT "8096"
+#define HOST "10.42.0.189"
+#define PORT "1500"
 #define TIME_OUT 10
 //------------variable check---------------------------------------------------
 std::mutex mtx;
