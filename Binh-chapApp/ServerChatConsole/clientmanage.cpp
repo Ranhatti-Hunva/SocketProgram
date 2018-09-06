@@ -3,7 +3,7 @@
 #include <mutex>
 #include <map>
 
-std::mutex mtx;
+
 
 ClientManage::ClientManage()
 {
@@ -204,12 +204,14 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
                 // dong goi truoc khi send
                 send(clientList[i].socketfd ,buffer,sizeof(buffer),0);
                 //add Q timeout rsp
+                //mtx.lock();
                 gettimeofday(&tv, nullptr);
                 timeoutNode to;
                 to.timeout = tv.tv_sec*1000 + tv.tv_usec/1000 ;
                 to.msgID = msgSend.ID;
                 to.socket = clientList[i].socketfd;
                 timeoutList.push_back(to);
+                //mtx.unlock();
 
             }
         }
@@ -224,12 +226,14 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
                 //usleep(1000);
                 send(clientList[posClient].socketfd ,buffer,sizeof(buffer),0);
                 flag = true;
+                mtx.lock();
                 gettimeofday(&tv, nullptr);
                 timeoutNode to;
                 to.timeout = tv.tv_sec*1000 + tv.tv_usec/1000 ;
                 to.msgID = msgSend.ID;
                 to.socket = clientList[posClient].socketfd;
                 timeoutList.push_back(to);
+                mtx.unlock();
             }
             else{
                 std::ofstream outfile;

@@ -95,6 +95,7 @@ void ServerChat::clientQRecv(struct msg_text msgHandle,
         cliManage.sendMsgToClient(clientList,msgbuf,msgHandle.socketfd,timeoutList);
         break;
     case RSP:
+        //mtx.lock();
         std::vector<timeoutNode>::iterator it;
         if(!timeoutList.empty()){
             it = std::find_if(timeoutList.begin(),timeoutList.end(),
@@ -105,6 +106,7 @@ void ServerChat::clientQRecv(struct msg_text msgHandle,
                 timeoutList.erase(it);
             }
         }
+        //mtx.unlock();
         std::cout<<"rsp id msg: " <<msgHandle.ID<< " from socket "<<msgHandle.socketfd <<"\n";
         //find and erase msg in timeout list
         break;

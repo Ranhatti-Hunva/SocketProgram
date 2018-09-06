@@ -60,14 +60,14 @@ public:
 
 
 private:
-    long int timeOut = 5000;
+    long int timeOut = 20000;
     fd_set listener; //listener file decriptor list
     fd_set read_fds; //temp file descritopr list for select
     int sockfd,fdmax, newfd; // sockfd socket file descriptor, listening onl sockfd
     // max number of connection on fdmax
     // new file descritor
     //std:: queue <struct msg_>  qRecv;
-    ThreadPool pool{10};
+    ThreadPool pool{30};
 
     std:: queue <struct msg_text> qRecv;
     std:: queue <struct msg_text> qSend;
