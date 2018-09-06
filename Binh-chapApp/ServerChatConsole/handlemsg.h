@@ -29,8 +29,8 @@ public:
     HandleMsg();
     void ultoc(unsigned int& ul, unsigned char* cu);
     bool packed_msg(struct msg_text& msg_input, unsigned char* buffer);    
-    bool unpacked_msg(struct msg_text& msg_output, unsigned char* buffer, unsigned int num_data);
-
+    //bool unpacked_msg(struct msg_text& msg_output, unsigned char* buffer, unsigned int num_data);
+    bool unpacked_msg(msg_text& msg_output, std::vector<unsigned char>& buffer);
 
 };
 

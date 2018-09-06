@@ -297,59 +297,62 @@ void ServerChat::mainLoop(){
                         recvMsg.type_msg = -1;
                         recvMsg.socketfd = i;
 //                        std::cout<<"recv \n";
-                        bool is_success = handlMsg.unpacked_msg(recvMsg,buf.get(),nbytes);
-//                        for(int i = 0; i< nbytes;i++){
-//                            std::cout<<(unsigned int)buf.get()[i]<<" ";
-//                        }
-//                        std::cout<<"\n";
-//                        //std::cout<<(unsigned int)buf.get()<<"\n";
-//                        if(is_success){
-//                            std::cout<<"id "<<recvMsg.ID<<" type "<<(int)recvMsg.type_msg
-//                                    <<" content "<<recvMsg.msg<<"\n";
-//                        }
 
-                        if(recvMsg.type_msg == SGI){
-                            rspMsg.ID = recvMsg.ID;
 
-                            //std::cout<<"msg id :"<<recvMsg.ID<<"\n";
+                        //bool is_success = handlMsg.unpacked_msg(recvMsg,buf.get(),nbytes);
 
-                            rspMsg.type_msg = RSP;
-                            rspMsg.msg = "";
-                            rspMsg.socketfd = i;
-                            clientQSend(rspMsg);
-                            usleep(1000);//1ms
-                            clientQRecv(recvMsg,client,timeoutList);
-                            if(skExist != -1){
-                                mtx.lock();
-                                close(skExist);                                
-                                FD_CLR(skExist,&listener);
-                                skExist = -1;
-                                mtx.unlock();
+                        std::vector<unsigned char> buffer;
+                        buffer.insert(buffer.end(),&buf.get()[0],&buf.get()[nbytes]);
 
-                                //send(skExist,"close",5,0);
-                                //close(skExist);
+                        while(buffer.size()>0){
+                            bool is_success = handlMsg.unpacked_msg(recvMsg,buffer);
+                            if(!is_success){
+                                break;
                             }
+                            else{
+                                if(recvMsg.type_msg == SGI){
+                                    rspMsg.ID = recvMsg.ID;
 
+                                    //std::cout<<"msg id :"<<recvMsg.ID<<"\n";
+
+                                    rspMsg.type_msg = RSP;
+                                    rspMsg.msg = "";
+                                    rspMsg.socketfd = i;
+                                    clientQSend(rspMsg);
+                                    usleep(1000);//1ms
+                                    clientQRecv(recvMsg,client,timeoutList);
+                                    if(skExist != -1){
+                                        mtx.lock();
+                                        close(skExist);
+                                        FD_CLR(skExist,&listener);
+                                        skExist = -1;
+                                        mtx.unlock();
+
+                                        //send(skExist,"close",5,0);
+                                        //close(skExist);
+                                    }
+
+                                }
+                                //qSend send respond to client
+                                //qRecv send msg to another client
+
+                                if(recvMsg.type_msg != RSP && recvMsg.type_msg != SGI){
+                                    rspMsg.ID = recvMsg.ID;
+
+                                    //std::cout<<"msg id :"<<recvMsg.ID<<"\n";
+
+                                    rspMsg.type_msg = RSP;
+                                    rspMsg.msg = "";
+                                    rspMsg.socketfd = i;
+                                    qSend.push(rspMsg);
+                                }
+                                if(recvMsg.type_msg != SGI){
+                                    qRecv.push(recvMsg);
+                                }
+
+                                //delete[] buf;
+                            }
                         }
-
-                        //qSend send respond to client
-                        //qRecv send msg to another client
-
-                        if(recvMsg.type_msg != RSP && recvMsg.type_msg != SGI){
-                            rspMsg.ID = recvMsg.ID;
-
-                            //std::cout<<"msg id :"<<recvMsg.ID<<"\n";
-
-                            rspMsg.type_msg = RSP;
-                            rspMsg.msg = "";
-                            rspMsg.socketfd = i;
-                            qSend.push(rspMsg);
-                        }
-                        if(recvMsg.type_msg != SGI){
-                            qRecv.push(recvMsg);
-                        }
-
-                        //delete[] buf;
                     }
                 }
             }
