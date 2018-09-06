@@ -41,7 +41,7 @@ public:
     void initClient();
     // createsocket and connect
     int createSocket();
-    void mainLoop();
+
     void cleanUp();
     int sendall(int socket, const char *buf,int len);
     int timeoutConnect(char *host, char *port, int timeout);

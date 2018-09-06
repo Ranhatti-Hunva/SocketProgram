@@ -1,17 +1,17 @@
 #include "clientchat.h"
-
+//---------------------------------------------------------------------------------------
 ClientChat::ClientChat()
 //    :m_svAddr(svAddr),m_port(port)
 {
     FD_ZERO(&talker);
     fd_max = 0;
 }
-
+//---------------------------------------------------------------------------------------
 ClientChat::~ClientChat()
 {
     cleanUp();
 }
-
+//---------------------------------------------------------------------------------------
 void * ClientChat::get_in_addr(struct sockaddr *sa){
     if (sa->sa_family == AF_INET) {
         return &(((struct sockaddr_in*)sa)->sin_addr);
@@ -19,7 +19,7 @@ void * ClientChat::get_in_addr(struct sockaddr *sa){
 
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
-
+//---------------------------------------------------------------------------------------
 
 void ClientChat::initClient(){
     memset(&hints, 0, sizeof hints);
@@ -31,7 +31,7 @@ void ClientChat::initClient(){
         return;
     }
 }
-
+//---------------------------------------------------------------------------------------
 
 int ClientChat::createSocket(){
     for( p = servinfo; p!= nullptr; p = p->ai_next){
@@ -64,7 +64,7 @@ int ClientChat::createSocket(){
 
     return sockfd;
 }
-
+//---------------------------------------------------------------------------------------
 
 int ClientChat::sendall(int socket,const char *buf, int len)
 {
@@ -84,14 +84,11 @@ int ClientChat::sendall(int socket,const char *buf, int len)
     return n==-1?-1:0; // return -1 on failure, 0 on success
 }
 
-
-void ClientChat::mainLoop(){
-}
-
+//---------------------------------------------------------------------------------------
 int ClientChat::getsocket(){
     return sockfd;
 }
-
+//---------------------------------------------------------------------------------------
 int  ClientChat::timeoutConnect(char *host,char* port, int timeout){
     timeval Timeout;
     Timeout.tv_sec = timeout;
@@ -169,12 +166,11 @@ int  ClientChat::timeoutConnect(char *host,char* port, int timeout){
 
     }
 }
-
+//---------------------------------------------------------------------------------------
 std::string ClientChat::getServerName(){
     return std::string(s,0,sizeof(s));
 }
-
-
+//---------------------------------------------------------------------------------------
 void ClientChat::cleanUp(){
     close(sockfd);
 }

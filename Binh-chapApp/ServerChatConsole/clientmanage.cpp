@@ -9,7 +9,7 @@ ClientManage::ClientManage()
 {
 
 }
-//login client
+//------login client---------------------------------------------------------------------
 int ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,
                                       int socketfd, char * buf, fd_set &fds){
     bool flagCheck = false;
@@ -73,14 +73,12 @@ int ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,
                         HandleMsg handleMsg;
                         handleMsg.packed_msg(msgSend,buffer);
 
-                        usleep(1000);
+                        //usleep(1000);
                         send(clientList[posClient].socketfd,buffer,sizeof(buffer),0);
 
                         std::cout<<line<<"\n";
                     }
 
-
-                    //std::cout<<std::string(a,0,1024)<<"\n";
                     //delete []a;
                 }
                 infile.close();
@@ -117,113 +115,9 @@ int ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,
     }
     return socketExist;
 
-    /*
-    for(int i = 0; i < MAX_CLIENT; i++){
-        // gui cac msg khi client offline
-
-        //(neu full client gui msg thong bao va close connect)
-
-        // client da ton tai -> status on -> kiem tra queue msg co ng gui khong
-        if((clientList[i].id != -1) && (strcmp(clientList[i].name,buf) == 0)
-                && (clientList[i].status == false)){
-            flagCheck = true;
-            //send(socketfd,"success",7,0);
-
-            //check socket co mo hay ko truong hop timeout
-            if(FD_ISSET(clientList[i].socketfd,&fds) == 0){
-                int error_code;
-                socklen_t optlen = sizeof(error_code);
-
-                int res = getsockopt(clientList[i].socketfd, SOL_SOCKET, SO_ERROR, &error_code, &optlen);
-                //socket is open
-                if(error_code==0 && res == 0){
-                    socketExist = clientList[i].socketfd;
-                }
-            }
-
-
-            clientList[i].status = true;
-            clientList[i].socketfd = socketfd;
-            usleep(1000);
-            std::ifstream infile;
-            char * filename = new char[strlen(clientList[i].name)];
-            strcpy(filename,clientList[i].name);
-            //std::string e;
-            infile.open(strcat(filename,".txt"));
-
-            if(infile.is_open() == true){
-                while(!infile.eof()){
-                    //char * a = new char [1024];
-                    std::string line;
-                    getline (infile,line);
-                    //infile.getline(a,1024);
-
-                    //dong goi data
-                    if(!line.empty()){
-                        struct msg_text msgSend;
-                        msgSend.type_msg = MSG;
-
-                        //msgSend.msg.assign(std::string(a,0,strlen(a)));
-                        msgSend.msg.assign(line);
-                        unsigned char buffer[msgSend.msg.length()+9];
-                        HandleMsg handleMsg;
-                        handleMsg.packed_msg(msgSend,buffer);
-
-                        //qRecv.push(msgSend);
-                        usleep(1000);
-                        send(clientList[i].socketfd,buffer,sizeof(buffer),0);
-
-
-                        std::cout<<line<<"\n";
-                    }
-
-
-                    //std::cout<<std::string(a,0,1024)<<"\n";
-                    //delete []a;
-                }
-                infile.close();
-                std::ofstream ofs;
-                ofs.open(filename, std::ofstream::out | std::ofstream::trunc);
-                ofs.close();
-            }
-
-
-            break;
-            //configClientFlag = true;
-
-        }
-        // da ton tai username do roi
-        else if(clientList[i].id != -1 && strcmp(clientList[i].name,buf) == 0
-                && clientList[i].status == true){
-
-            flagCheck = true;
-            socketExist = clientList[i].socketfd;
-            clientList[i].socketfd = socketfd;
-
-            break;
-
-        }
-        // client chua ton tai -> tao client moi
-        else if(clientList[i].id == -1){
-            clientList[i].name = new char[strlen(buf)+1];
-            strcpy(clientList[i].name,buf);
-            std::cout<<"Client connect info: ";
-            std::cout<<"Name " << std::string(clientList[i].name,0,strlen(clientList[i].name))<<" - ";
-            std::cout<<"socket "<<socketfd<<"\n";
-            clientList[i].id = i;
-            clientList[i].socketfd = socketfd;
-            //clientSocket = -1;
-            clientList[i].status = true;
-            flagCheck = true;
-            //send(socketfd,"success",7,0);
-            break;
-        }
-    }
-*/
-
 }
 
-//send Msg To client--------------------------------------------------------------------
+//------------send Msg To client---------------------------------------------------------
 
 void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
                                    char *msg, int socketfd,
@@ -257,27 +151,6 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
             mapClient.insert(std::pair<std::string,int>(clientList[i].name,clientList[i].id));
         }
     }
-
-    //        it = mapClient.find(nameClientSend);
-    //        //tim thay ten nguoi muon gui trong list
-    //        if (it != mapClient.end()){
-    //            int posClient = it->second;
-    //            if(strlen(nameClientSend)+1 <= strlen(dataMsg.get())){
-    //                //get name of client send msg
-    //                std::string msgData = std::string(dataMsg.get(),0,strlen(dataMsg.get()))
-    //                        .substr(strlen(nameClientSend)+1,strlen(dataMsg.get()));
-
-    //                std::cout<<"\ndata msg: "<< msgData << "\n";
-
-    //                strcat(bufSend.get(),clientList[posClient].name);
-    //                strcat(bufSend.get(),": ");
-    //                strcat(bufSend.get(),msgData.c_str());
-    //            }
-    //        }
-    //        else{
-    //            std::cout<<"\nwrong format\n";
-    //        }
-
 
     //assign ten ng gui
     for(int i = 0; i < MAX_CLIENT ; i++){
@@ -348,7 +221,7 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
             //std::cout<<"pos "<<posClient<<"\n";
             if(clientList[posClient].status == true){
                 //dam bao rsp se gui truoc msg trong truong hop client gui msg cho chinh no
-                usleep(1000);
+                //usleep(1000);
                 send(clientList[posClient].socketfd ,buffer,sizeof(buffer),0);
                 flag = true;
                 gettimeofday(&tv, nullptr);
@@ -373,7 +246,7 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
                 strftime(buf, sizeof(buf), "%a %Y-%m-%d %H:%M:%S", &ts);
                 outfile << bufSend <<" --- "<< buf <<std::endl;
                 outfile.close();
-                std::cout<< "xxxxxxxxxxxxx\n";
+                std::cout<< "store msg !\n";
                 flag = true;
             }
         }

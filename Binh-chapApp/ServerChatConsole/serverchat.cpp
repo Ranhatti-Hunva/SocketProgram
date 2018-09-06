@@ -1,17 +1,17 @@
 #include "serverchat.h"
 
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------
 ServerChat::ServerChat(char* ipAddress, char* port)
     :m_ipAddr(ipAddress), m_port(port)
 {
 
 }
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------
 ServerChat::~ServerChat(){
     cleanUp();
 }
 
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------
 void ServerChat::initSet(){
     memset(&hints, 0 , sizeof(hints)); // clear memory of hints
     hints.ai_family = AF_UNSPEC;
@@ -23,7 +23,7 @@ void ServerChat::initSet(){
     }
 }
 
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------
 int ServerChat::createSocket(){
     for( p = servinfo; p!= nullptr; p = p->ai_next){
         sockfd = socket(p->ai_family,p->ai_socktype,p->ai_protocol);
@@ -57,7 +57,7 @@ int ServerChat::createSocket(){
     }
     return sockfd;
 }
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------
 bool ServerChat::listenSocket(int sock, int backLog){
     if(listen(sock,backLog) == -1){
         perror("listen");
@@ -65,17 +65,14 @@ bool ServerChat::listenSocket(int sock, int backLog){
     }
     return true;
 }
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------
 void ServerChat::clientQRecv(struct msg_text msgHandle,
                              std::vector <clientNode> &clientList,
                              std::vector <timeoutNode> &timeoutList){
     ClientManage cliManage;
 
     //std::unique_ptr<char> msgbuf(new char[2048]);
-//    std::cout<<"68 id "<<msgHandle.ID << " type "<<(int)msgHandle.type_msg
-//            <<" msg "<<msgHandle.msg<<"\n";
     char *msgbuf = new char[msgHandle.msg.size()];
-
 
     strcpy(msgbuf,msgHandle.msg.c_str());
     //std::cout<<"msg :"<<msgHandle.msg<<"\n";
@@ -94,11 +91,8 @@ void ServerChat::clientQRecv(struct msg_text msgHandle,
         }
         break;
 
-    case MSG:
-        //std::cout<<
+    case MSG:        
         cliManage.sendMsgToClient(clientList,msgbuf,msgHandle.socketfd,timeoutList);
-        //add Q time out wait for rsp
-        //std::cout<<"id msg bf send: " <<msgHandle.ID<< " from socket "<<msgHandle.socketfd <<"\n";
         break;
     case RSP:
         std::vector<timeoutNode>::iterator it;
@@ -110,10 +104,6 @@ void ServerChat::clientQRecv(struct msg_text msgHandle,
             if (it != timeoutList.end()){
                 timeoutList.erase(it);
             }
-//            std::cout<<timeoutList.front().msgID<<" "<<
-//                       timeoutList.front().socket<<" "<<
-//                        timeoutList.front().timeout<<"\n";
-//            std::cout <<"hehehe \n";
         }
         std::cout<<"rsp id msg: " <<msgHandle.ID<< " from socket "<<msgHandle.socketfd <<"\n";
         //find and erase msg in timeout list
@@ -121,7 +111,7 @@ void ServerChat::clientQRecv(struct msg_text msgHandle,
     }
     //delete [] msgbuf;
 }
-// thread time for time out ---------------------------------------------------
+//---------------------------------------------------------------------------------------
 void ServerChat::timeoutThread(fd_set &fd,
                                std::vector <clientNode> &clientList,
                                std::vector <timeoutNode> &timeoutList){
@@ -148,9 +138,9 @@ void ServerChat::timeoutThread(fd_set &fd,
     }
 }
 
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------
 //send respond
-void clientQSend(struct msg_text msgHandle/*, std::vector <clientNode> &clientList*/){
+void clientQSend(struct msg_text msgHandle){
 
     HandleMsg grapMsg;
 
@@ -166,7 +156,7 @@ void clientQSend(struct msg_text msgHandle/*, std::vector <clientNode> &clientLi
 }
 
 
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------
 // wait connect
 // close listening socket
 // loop
@@ -294,25 +284,14 @@ void ServerChat::mainLoop(){
                            send -> deQmsg
                         */
 
-//                        std::cout<<"recv \n";
-
-
-                        //bool is_success = handlMsg.unpacked_msg(recvMsg,buf.get(),nbytes);
-
                         std::vector<unsigned char> buffer;
                         buffer.insert(buffer.end(),&buf.get()[0],&buf.get()[nbytes]);
                         //std::cout <<"nhan " << nbytes <<"\n";
 
                         while(buffer.size()>0){
                             msg_text recvMsg,rspMsg;
-                            //recvMsg.ID = 0;
-                            //recvMsg.msg.clear();
-                            //recvMsg.type_msg = -1;
                             recvMsg.socketfd = i;
                             bool is_success = handlMsg.unpacked_msg(recvMsg,buffer);
-
-//                            std::cout<<"1 id "<<recvMsg.ID << " type "<<(int)recvMsg.type_msg
-//                                    <<" msg "<<recvMsg.msg<<"\n";
 
                             if(!is_success){
                                 break;
@@ -357,8 +336,7 @@ void ServerChat::mainLoop(){
                                 }
                                 if(recvMsg.type_msg != SGI){
                                     qRecv.push(recvMsg);
-//                                    std::cout<<"2 id "<<recvMsg.ID << " type "<<(int)recvMsg.type_msg
-//                                            <<" msg "<<recvMsg.msg<<"\n";
+
                                 }
 
                                 //delete[] buf;
@@ -375,19 +353,10 @@ void ServerChat::mainLoop(){
             qMsg.type_msg = qRecv.front().type_msg;
             qMsg.socketfd = qRecv.front().socketfd;
 
-//            std::cout<<"4 id "<<qRecv.front().ID << " type "<<(int)qRecv.front().type_msg
-//                    <<" msg "<<qRecv.front().msg<<"\n";
-
             pool.enqueue([&,qMsg]{
-//                std::cout<<"59 id "<<qMsg.ID << " type "<<(int)qMsg.type_msg
-//                        <<" msg "<<qMsg.msg<<"\n";
                 clientQRecv(qMsg,client,timeoutList);
-//                std::cout<<"6 id "<<qMsg.ID << " type "<<(int)qMsg.type_msg
-//                        <<" msg "<<qMsg.msg<<"\n";
             });
 
-//            std::cout<<"5 id "<<qMsg.ID << " type "<<(int)qMsg.type_msg
-//                    <<" msg "<<qMsg.msg<<"\n";
             qRecv.pop();
         }
         while(!qSend.empty()){
@@ -407,14 +376,14 @@ void ServerChat::mainLoop(){
 
 }
 
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------
 void* ServerChat::get_in_addr(struct sockaddr *sa){
     if(sa->sa_family == AF_INET){
         return &(((struct sockaddr_in*)sa)->sin_addr);
     }
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
-//
+//---------------------------------------------------------------------------------------
 void ServerChat:: cleanUp(){
     close(sockfd);
 }

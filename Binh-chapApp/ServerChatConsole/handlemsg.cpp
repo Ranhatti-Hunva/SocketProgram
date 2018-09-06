@@ -4,7 +4,7 @@ HandleMsg::HandleMsg()
 {
 
 }
-
+//---------------------------------------------------------------------------------------
 void HandleMsg::ultoc(unsigned int& ul, unsigned char* cu){
     ul = 0;
     for (unsigned int i=0; i<4; i++)
@@ -13,7 +13,7 @@ void HandleMsg::ultoc(unsigned int& ul, unsigned char* cu){
         ul |= j;
     };
 }
-
+//---------------------------------------------------------------------------------------
 bool HandleMsg::packed_msg(struct msg_text& msg_input, unsigned char* buffer){
     unsigned int len = msg_input.msg.length()+9;
     unsigned char len_byte[4];
@@ -71,47 +71,7 @@ bool HandleMsg::packed_msg(struct msg_text& msg_input, unsigned char* buffer){
     return true;
 }
 
-/*bool HandleMsg::unpacked_msg(struct msg_text& msg_output, unsigned char* buffer, unsigned int num_data){
-    if(num_data < 9)
-    {
-        // Shortest msg has 9 bytes in length.
-        return false;
-    }
-    else
-    {
-        unsigned int len_msg;
-        ultoc(len_msg,buffer);
-        //printf("=> Length msg: %u \n", len_msg);
-        //printf("=> Num data: %u \n", num_data);
-
-        if(num_data < len_msg)
-        {
-            return false;
-        }
-        else
-        {
-            buffer +=4;
-            msg_output.type_msg = *buffer;
-
-            buffer ++;
-            ultoc(msg_output.ID,buffer);
-
-            if (msg_output.type_msg < 2)
-            {
-                msg_output.msg.clear();
-                buffer +=4;
-
-                while((*buffer != 0) && (buffer != nullptr))
-                {
-                    msg_output.msg = msg_output.msg + static_cast<char>(*buffer);
-                    buffer++;
-                };
-            };
-            return true;
-        };
-    };
-}*/
-
+//---------------------------------------------------------------------------------------
 bool HandleMsg::unpacked_msg(msg_text& msg_output, std::vector<unsigned char>& buffer)
 {
     if(buffer.size() < 9)
