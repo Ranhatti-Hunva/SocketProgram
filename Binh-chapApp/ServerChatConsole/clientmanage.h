@@ -21,7 +21,7 @@
 
 #include <memory>
 #include <mutex>
-#define MAX_CLIENT 50
+#define MAX_CLIENT 100
 
 
 

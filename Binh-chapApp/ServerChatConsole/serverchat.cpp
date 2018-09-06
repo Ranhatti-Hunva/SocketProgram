@@ -326,7 +326,7 @@ void ServerChat::mainLoop(){
                                 //qSend send respond to client
                                 //qRecv send msg to another client
 
-                                if(recvMsg.type_msg != RSP && recvMsg.type_msg != SGI){
+                                if(recvMsg.type_msg != RSP && recvMsg.type_msg != SGI && recvMsg.type_msg != MSG){
                                     rspMsg.ID = recvMsg.ID;
 
                                     //std::cout<<"msg id :"<<recvMsg.ID<<"\n";

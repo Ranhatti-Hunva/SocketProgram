@@ -268,10 +268,11 @@ void timeoutThread(int socket,std::vector<timeoutSend>&timeoutQ,std::queue<msg_t
                     //buf = new unsigned char [9];
                     int numRecv = recv(socket,buf.get(),9,0);
                     if(numRecv > 0){
-
+                        int flagbreak = false;
                         std::vector<unsigned char> buffer;
                         buffer.insert(buffer.end(),&buf.get()[0],&buf.get()[numRecv]);
                         while(buffer.size()>0){
+                            //std::cout<<"co ping\n";
                             bool is_success = handleMsg.unpacked_msg(msgRecv,buffer);
                             if(!is_success){
                                 break;
@@ -284,11 +285,14 @@ void timeoutThread(int socket,std::vector<timeoutSend>&timeoutQ,std::queue<msg_t
                                     msgQ.push(timeoutQ.front().msg);
 
                                     timeoutQ.erase(timeoutQ.begin());
-
-
+                                    std::cout<<"resend and continue chat\n";
+                                    flagbreak = true;
                                     break;
                                 }
                             }
+                        }
+                        if(flagbreak){
+                            break;
                         }
                         //handleMsg.unpacked_msg(msgRecv,buf.get(),numRecv);
 

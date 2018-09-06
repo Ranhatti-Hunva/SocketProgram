@@ -28,7 +28,7 @@
 #include "clientnode.h"
 #include "threadpool.h"
 
-#define BACKLOG 50
+#define BACKLOG 100
 //#define MAX_CLIENT 50
 
 
