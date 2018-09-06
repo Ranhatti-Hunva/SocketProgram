@@ -156,6 +156,12 @@ bool TCPhelper::packed_msg(msg_text& msg_input, std::vector<unsigned char>& elem
 
 void TCPclient::send_msg(msg_queue& msg_wts, bool& end_connection, int socket_fd)
 {
+    if (user_name.empty())
+    {
+        printf("=> Login local faile!!!. Plz restart programme!");
+        exit(EXIT_FAILURE);
+    };
+
     msg_text msg_login;
     msg_login.msg = user_name;
     msg_login.type_msg = SGI;
@@ -218,8 +224,9 @@ void TCPclient::send_msg(msg_queue& msg_wts, bool& end_connection, int socket_fd
                 FD_SET(socket_fd,&send_fds);
                 if (select(socket_fd+1,nullptr, &send_fds, nullptr, &general_tv) <0)
                 {
-                    perror("=>Select ");
+                    perror("=> Error with select on this socket");
                     end_connection = true;
+                    is_error = true;
                     break;
                 };
 
@@ -233,6 +240,7 @@ void TCPclient::send_msg(msg_queue& msg_wts, bool& end_connection, int socket_fd
                         {
                             printf("=> Sending failure !!!");
                             end_connection = true;
+                            is_error = true;
                             break;
                         };
                     }
@@ -251,6 +259,7 @@ void TCPclient::send_msg(msg_queue& msg_wts, bool& end_connection, int socket_fd
                     {
                         printf("=> Error on sending message");
                         end_connection = true;
+                        is_error = true;
                         break;
                     };
                 };
@@ -398,7 +407,7 @@ int TCPclient::recv_msg(const int client_fd, msg_queue& msg_wts, thread_pool& th
 
     if (FD_ISSET(client_fd, &read_fds))
     {
-        const unsigned int bufsize = 1024;
+        const unsigned int bufsize = 20;
         unsigned char recv_buf[bufsize] = {0};
         long num_data;
 
@@ -456,7 +465,6 @@ void TCPclient::process_on_buffer_recv(const unsigned char buffer[], const long 
         if (!is_msg_usable)
         {
             this->buffer = buffer_all;
-            lock_buffer.unlock();
             break;
         }
         else
@@ -524,6 +532,7 @@ void TCPclient::timeout_clocker(bool& end_connection)
                                 printf("   PING timeout !!! \n");
                                 rps_timeout_list.erase(rps_timeout_list.begin()+static_cast<long>(i));
                                 end_connection = true;
+                                is_error = true;
                                 this -> ping = false;
 
                                 lock_ping.unlock();

@@ -63,6 +63,7 @@ void read_terminal(bool& end_connection, TCPclient& client_helper, msg_queue& ms
                     else
                     {
                         end_connection = true;
+                        is_error = false;
                         break;
                     };
                 };

@@ -284,7 +284,7 @@ int TCPserver::recv_msg(int server_fd, client_list& client_socket_list, msg_queu
     {
         if(FD_ISSET(this->client_fds[i], &read_fds))
         {
-            const unsigned int bufsize = 1024;
+            const unsigned int bufsize = 20;
             unsigned char recv_buffer[bufsize] = {0};
             long num_data = 0;
 
@@ -340,11 +340,10 @@ void TCPserver::process_on_buffer_recv(const unsigned char buffer[],  const long
             if (!is_msg_usable)
             {
                 host_msg->buffer = buffer_all;
-//                lock_buffer.unlock();
+                break;
             }
             else
             {
-//                lock_buffer.unlock();
                 if(RSP == msg_get.type_msg)
                 {
                     this -> msg_confirm(msg_get);
@@ -550,8 +549,9 @@ void TCPserver::send_msg(msg_queue& msg_wts, bool& end_connection, client_list& 
                 FD_SET(element.socket_fd,&send_fds);
                 if (select(element.socket_fd+1,nullptr, &send_fds, nullptr, &general_tv) <0)
                 {
-                    perror("=>Select ");
+                    perror("=> Error with select on this socket");
                     this->closer(element.socket_fd,client_socket_list);
+                    break;
                 };
 
                 if(FD_ISSET(element.socket_fd, &send_fds))
@@ -632,7 +632,9 @@ void TCPserver::post_send_process(q_element element, const bool is_rsp, msg_queu
 
 void TCPserver::closer(int client_fd, client_list& client_socket_list)
 {
-    std::unique_lock<std::mutex> locker(fd_set_mutex);
+    client_socket_list.off_client(client_fd);
+
+    std::unique_lock<std::mutex> locker(fd_set_mutex);    
     FD_CLR(client_fd, &master);
     close(client_fd);
     for (unsigned long i=0; i < this->client_fds.size(); i++)
@@ -641,10 +643,8 @@ void TCPserver::closer(int client_fd, client_list& client_socket_list)
         {
             client_fds.erase(client_fds.begin()+static_cast<long>(i));
         };
-    };
+    };    
     locker.unlock();
-
-    client_socket_list.off_client(client_fd);
 }
 
 void TCPserver::timeout_clocker(bool& end_connection, client_list& client_socket_list)

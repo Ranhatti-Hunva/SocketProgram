@@ -22,6 +22,7 @@
 
 using namespace std;
 string user_name;
+bool is_error;
 
 int main()
 {
@@ -32,8 +33,9 @@ int main()
     /*------------------------------------------------------------------------------------------------------------*/
     // Searching server information. Change "" to specific host name if use remote server.
     struct addrinfo *server_infor, *p;
+//    server_infor = client_helper.get_addinfo_list("10.42.0.189",1500);
+//    server_infor = client_helper.get_addinfo_list("10.42.0.128",8096);
     server_infor = client_helper.get_addinfo_list("",1500);
-//    server_infor = client_helper.get_addinfo_list("10.42.0.127",8096);
     p = server_infor;
 
     /*------------------------------------------------------------------------------------------------------------*/
@@ -58,32 +60,50 @@ int main()
 
     // Start program.
     bool end_connection = false;
+    is_error = false;
     while (!end_connection)
     {
-        // Connection with timeout to server.
-        int client_fd;
-        while((client_fd=client_helper.connect_with_timeout(p))<0)
-        {
-            // Error connect to server or connect timeout.
-            bool flage_reconnect = is_reconnect(client_fd);
-            if (flage_reconnect)
-            {
-                exit(EXIT_FAILURE);
-            }
-        }
-
-        /*------------------------------------------------------------------------------------------------------------*/
-        // Connection success and start to communication.
-        printf("=> Welcome!! Enter # to end the connection \n\n");
-
-        msg_queue msg_wts;      // queue for the massages are wating to send.
-        msg_wts.clear(Q_MSG);
-        msg_wts.clear(Q_RSP);
-
         // Thread pool
         thread_pool threads(4);
 
+        // Queue for the massages are wating to send.
+        msg_queue msg_wts;
+        msg_wts.clear(Q_MSG);
+        msg_wts.clear(Q_RSP);
+
+        int client_fd;
+
+        // read terminal
         threads.enqueue(read_terminal, ref(end_connection), ref(client_helper), ref(msg_wts));
+
+        // Connection with timeout to server.
+        while(!end_connection)
+        {
+            client_fd = client_helper.connect_with_timeout(p);
+            if(client_fd < 0)
+            {
+                if(end_connection)
+                {
+                    exit(EXIT_FAILURE);
+                }
+                else
+                {
+                    printf("=> Reconnection again! \n");
+                    close(client_fd);
+                    sleep(1);
+                    continue;
+                };
+            }
+            else
+            {
+                printf("=> Connect succesffull! \n");
+                printf("=> Welcome!! Enter # to end the connection \n\n");
+                break;
+            }
+        };
+
+        /*------------------------------------------------------------------------------------------------------------*/
+        // Connection success and start to communication.
 
         threads.enqueue([&]()
         {
@@ -102,10 +122,24 @@ int main()
             if(is_disconnect < 0)
             {
                 end_connection = true;
+                is_error = true;
+                sleep(2);
                 break;
             }
         };
-        end_connection = is_reconnect(client_fd);
+
+        if (is_error)
+        {
+            // Restart the process beciuse
+            end_connection = false;
+            is_error = false;
+            close(client_fd);
+        }
+        else
+        {
+            // Does user really want to disconnect?
+            end_connection = is_reconnect(client_fd);
+        };
     };
 
     /*------------------------------------------------------------------------------------------------------------*/

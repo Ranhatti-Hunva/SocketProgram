@@ -28,6 +28,8 @@
 #define PIG 2
 #define RSP 3
 
+extern bool is_error;
+
 static std::mutex log_mutext;
 
 class TCPhelper
