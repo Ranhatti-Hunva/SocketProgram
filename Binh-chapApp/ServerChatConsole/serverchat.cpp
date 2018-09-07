@@ -104,10 +104,14 @@ void ServerChat::clientQRecv(struct msg_text msgHandle,
             });
             if (it != timeoutList.end()){
                 timeoutList.erase(it);
+//                it = std::find_if(timeoutList.begin(),timeoutList.end(),
+//                                  [=] (timeoutNode const& f) {
+//                    return ((f.socket == msgHandle.socketfd));
+//                });
             }
         }
         //mtx.unlock();
-        std::cout<<"rsp id msg: " <<msgHandle.ID<< " from socket "<<msgHandle.socketfd <<"\n";
+        //std::cout<<"rsp id msg: " <<msgHandle.ID<< " from socket "<<msgHandle.socketfd <<"\n";
         //find and erase msg in timeout list
         break;
     }
@@ -124,7 +128,9 @@ void ServerChat::timeoutThread(fd_set &fd,
             gettimeofday(&tp, nullptr);
             if((tp.tv_sec * 1000 + tp.tv_usec / 1000) - timeoutList.front().timeout> timeOut){
                 //std::cout << "co vao hehe\n";
-                std::cout<<"client timeout!!!\n";
+                std::cout<<"client timeout!!! ";
+                std::cout<<"socket "<<timeoutList.front().socket<<" msg ID "<<
+                        timeoutList.front().msgID<<"\n";
                 //close clear from fd off client;
                 for(int i = 0; i<MAX_CLIENT;i++){
                     if((clientList[i].status == true)&&
@@ -326,7 +332,7 @@ void ServerChat::mainLoop(){
                                 //qSend send respond to client
                                 //qRecv send msg to another client
 
-                                if(recvMsg.type_msg != RSP && recvMsg.type_msg != SGI && recvMsg.type_msg != MSG){
+                                if(recvMsg.type_msg != RSP && recvMsg.type_msg != SGI){
                                     rspMsg.ID = recvMsg.ID;
 
                                     //std::cout<<"msg id :"<<recvMsg.ID<<"\n";

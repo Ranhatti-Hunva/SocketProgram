@@ -8,15 +8,9 @@
 #include <algorithm>    // std::find_if
 #include <vector>       // std::vector
 #include <memory>
-<<<<<<< HEAD
-//----------------------------------------------------------------------------
-#define HOST "localhost"
-#define PORT "1500"
-=======
 //---------------------------------------------------------------------------------------
-#define HOST "localhost"
+#define HOST "10.42.0.126"
 #define PORT "8096"
->>>>>>> 9bfbd3a539a401fe153d32ca7395c0099c5064d7
 #define TIME_OUT 10
 //------------variable check-------------------------------------------------------------
 std::mutex mtx;
@@ -149,8 +143,8 @@ void cinFromConsole(int socket,std::queue<msg_text>&msgQ){
 
 
    //std::to_string(42);
-/* test 1000 msg/s
-    //sleep(10);
+/*//test 1000 msg/s
+    sleep(10);
     for(int i = 0;i <1000; i++){
         msgSend.type_msg = MSG;
         msgSend.msg.assign("all/hello "+std::to_string(i));

@@ -101,7 +101,7 @@ int  ClientChat::timeoutConnect(char *host,char* port, int timeout){
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
 
-    if ((rv = getaddrinfo(host, port, &hints, &servinfo)) != 0) {
+    if ((rv = getaddrinfo(host,port, &hints, &servinfo)) != 0) {
         std::cerr<<"getaddrinfo: " << gai_strerror(rv) << "\n";
         return -1;
     }
@@ -157,9 +157,9 @@ int  ClientChat::timeoutConnect(char *host,char* port, int timeout){
                 return -1;
             }
 
-//            arg = fcntl(sockfd, F_GETFL, NULL);
-//            arg &= (~O_NONBLOCK);
-//            fcntl(sockfd, F_SETFL, arg);
+            arg = fcntl(sockfd, F_GETFL, NULL);
+            arg &= (~O_NONBLOCK);
+            fcntl(sockfd, F_SETFL, arg);
 
             return sockfd;
         }

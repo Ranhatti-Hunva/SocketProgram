@@ -19,6 +19,8 @@
 #include <errno.h>
 #include <stdlib.h>
 
+#include <cstddef>        // std::size_t
+
 #include <memory>
 #include <mutex>
 #define MAX_CLIENT 100
