@@ -20,8 +20,10 @@
 #include <stdlib.h>
 
 #include <memory>
+#include <mutex>
+#define MAX_CLIENT 100
 
-#define MAX_CLIENT 50
+
 
 class ClientManage
 {
@@ -30,6 +32,8 @@ public:
     int mapClientWithSocket(std::vector <clientNode> &clientList,
                             int socketfd, char * buf, fd_set &fds);
     void sendMsgToClient(std::vector <clientNode> &clientList, char *msg, int socketfd, std::vector<timeoutNode> &timeoutList);
+private:
+    std::mutex mtx;
 };
 
 #endif // CLIENTMANAGE_H
