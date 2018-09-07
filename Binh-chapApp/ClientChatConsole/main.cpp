@@ -9,7 +9,7 @@
 #include <vector>       // std::vector
 #include <memory>
 //----------------------------------------------------------------------------
-#define HOST "10.42.0.189"
+#define HOST "localhost"
 #define PORT "1500"
 #define TIME_OUT 10
 //------------variable check---------------------------------------------------
