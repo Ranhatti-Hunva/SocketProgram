@@ -34,7 +34,7 @@ protected:
     fd_set master;
     int fd_max;
 
-    const int timeout = 5;
+    const int timeout = 10;
 public:
     struct timeval general_tv;
 

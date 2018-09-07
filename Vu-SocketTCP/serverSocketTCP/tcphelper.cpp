@@ -158,8 +158,8 @@ void TCPhelper::msg_confirm(const msg_text rsp)
     {
         if(rps_timeout_list[i].msg.ID == rsp.ID)
         {
-            std::chrono::duration<float> duration = std::chrono::system_clock::now() - rps_timeout_list[i].timeout;
-            printf("=> Get RSP for msg %d, respondre time: %f \n", rsp.ID, duration.count());
+//            std::chrono::duration<float> duration = std::chrono::system_clock::now() - rps_timeout_list[i].timeout;
+//            printf("=> Get RSP for msg %d, respondre time: %f \n", rsp.ID, duration.count());
 
             rps_timeout_list.erase(rps_timeout_list.begin()+static_cast<long>(i));
             break;
@@ -173,7 +173,8 @@ int TCPserver::server_echo(int port_num)
     int server_fd = -1;
     struct addrinfo *IP_list, *p;
 
-    IP_list = this->get_addinfo_list("",port_num);
+    IP_list = this->get_addinfo_list("10.42.0.187",port_num);
+//    IP_list = this->get_addinfo_list("",port_num);
     for(p = IP_list; p != nullptr; p = p->ai_next)
     {
         if ((server_fd = socket(p->ai_family, p->ai_socktype,p->ai_protocol)) == -1)
@@ -427,15 +428,16 @@ void TCPserver::process_on_buffer_recv(const unsigned char buffer[],  const long
                         };
                         case MSG:
                         {
-                            std::cout << "   Message "<< static_cast<int>(msg_get.ID)<<" from client on socket " << host_socket_fd << ":" << msg_get.msg <<std::endl;
+//                            std::cout << "   Message "<< static_cast<int>(msg_get.ID)<<" from client on socket " << host_socket_fd << ":" << msg_get.msg <<std::endl;
 
+                            printf("=> Message %d from client on socket %d : %s \n", static_cast<int>(msg_get.ID), host_socket_fd, msg_get.msg.c_str());
                             std::vector<std::string> container;
                             splits_string(msg_get.msg, container);
 
                             msg_text msg_trasnsfer;
                             msg_trasnsfer.type_msg = MSG;
 
-                            if(container[0].compare("All"))
+                            if(container[0].compare("all"))
                             {
                                 // MSG: forward_user_name/msg;
                                 // Format message
@@ -602,7 +604,7 @@ void TCPserver::send_msg(msg_queue& msg_wts, bool& end_connection, client_list& 
                 timepoint.socket = element.socket_fd;
                 rps_timeout_list.push_back(timepoint);
 
-                cout<< "=> Send msg "<< msg_unpacked.ID << " on socket " << element.socket_fd <<" - content:" << msg_unpacked.msg << endl;
+//                cout<< "=> Send msg "<< msg_unpacked.ID << " on socket " << element.socket_fd <<" - content:" << msg_unpacked.msg << endl;
             }
         };
     };
@@ -610,7 +612,7 @@ void TCPserver::send_msg(msg_queue& msg_wts, bool& end_connection, client_list& 
 
 void TCPserver::post_send_process(q_element element, const bool is_rsp, msg_queue& msg_wts)
 {
-    printf("=> It's gool to run");
+//    printf("=> It's gool to run");
     if(is_rsp)
     {
         msg_wts.pop(Q_RSP);

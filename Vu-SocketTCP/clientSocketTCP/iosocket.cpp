@@ -39,15 +39,33 @@ void read_terminal(bool& end_connection, TCPclient& client_helper, msg_queue& ms
                 getline(std::cin, user_cmd_str);
                 if(!user_cmd_str.empty())
                 {
+
                     if(user_cmd_str.compare("#"))
-                    {
+                    {                        
                         // Packet msg and push to msg_send_queue
                         std::vector<std::string> container;
                         splits_string(user_cmd_str, container);
 
                         if(container.size() < 2)
                         {
-                            printf("=> Wrong format message or no massge to send !! \n");
+                            // Test 1000 msg/s.
+                            if (!user_cmd_str.compare("1000"))
+                            {
+                                for (int i=0; i<1000; i++)
+                                {
+                                    msg_text msg_send;
+                                    msg_send.msg = "all/hello";
+                                    msg_send.type_msg = MSG;
+
+                                    std::vector<unsigned char> element;
+                                    client_helper.packed_msg(msg_send, element);
+                                    msg_wts.push(element, Q_MSG);
+                                }
+                            }
+                            else
+                            {
+                                printf("=> Wrong format message or no massge to send !! \n");
+                            };
                         }
                         else
                         {
