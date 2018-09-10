@@ -38,6 +38,7 @@ int main()
     msg_queue msg_wts;
     msg_wts.clear(Q_MSG);
     msg_wts.clear(Q_RSP);
+    msg_wts.clear(Q_RECV);
 
     // Flage stop server
     bool end_connection = false;
@@ -56,6 +57,11 @@ int main()
     {
         server_helper.timeout_clocker(end_connection, client_socket_list);
     });
+
+//    threads.enqueue([&]()
+//    {
+//        server_helper.buffer_analyser(end_connection, msg_wts, threads);
+//    });
 
     while(!end_connection)
     {

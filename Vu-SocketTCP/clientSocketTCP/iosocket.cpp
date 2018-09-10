@@ -222,8 +222,11 @@ bool push_file(file_infor file, TCPclient& client_helper, msg_queue& msg_wts, st
         client_helper.packed_msg(msg_send, element);
         msg_wts.push(element, Q_MSG);
 
+        cout << buffer << endl << endl;
         bytes_readed = read(fd,buffer,bufsize);
+
     };
+    close(fd);
     return true;
 };
 

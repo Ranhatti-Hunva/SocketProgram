@@ -80,6 +80,7 @@ public:
     int recv_msg(int server_fd, client_list& client_socket_list, msg_queue& msg_wts, thread_pool& threads);
 
     // Analyzer buffer, ....
+//    void buffer_analyser(bool& end_connection, msg_queue& msg_wts, thread_pool& threads);
     void process_on_buffer_recv(const unsigned char buffer[], const long num_data, client_list& client_socket_list, const int socket_fd, msg_queue& msg_wts);
 
     // Send packed message.
@@ -91,6 +92,7 @@ public:
     // Close socket.
     void closer(int server_fd, client_list& client_socket_list);
 
+    // Get timeout of msg.
     void timeout_clocker(bool& end_connection, client_list& client_socket_list);
 };
 

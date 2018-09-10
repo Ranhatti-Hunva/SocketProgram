@@ -9,6 +9,7 @@
 
 #define Q_MSG 0
 #define Q_RSP 1
+#define Q_RECV 2
 
 using namespace std;
 struct msg_text
@@ -28,9 +29,11 @@ class msg_queue{
 
     std::mutex msg_mutex;
     std::mutex rsp_mutex;
+    std::mutex recv_mutex;
 
     std::queue<q_element> msg;
     std::queue<q_element> rsp;
+    std::queue<q_element> recv;
 public:
     void push(const q_element element, int type_queue);
 

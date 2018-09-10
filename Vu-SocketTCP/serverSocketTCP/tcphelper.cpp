@@ -669,4 +669,20 @@ void TCPserver::timeout_clocker(bool& end_connection, client_list& client_socket
     };
 }
 
+//void TCPserver::buffer_analyser(bool& end_connection, msg_queue& msg_wts, thread_pool& threads)
+//{
+//    while(!end_connection)
+//    {
+//        if(!msg_wts.is_empty(Q_RECV))
+//        {
+//            q_element element = msg_wts.get(Q_RECV);
+
+//        }
+//        else
+//        {
+//            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+//        }
+//    }
+//}
+
 

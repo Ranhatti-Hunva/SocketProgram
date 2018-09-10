@@ -2,7 +2,7 @@
 
 void msg_queue::push(const q_element element, int type_queue)
 {
-    if (type_queue > 1)
+    if (type_queue > 2)
     {
         perror("=> Wrong type queue!");
     }
@@ -20,6 +20,12 @@ void msg_queue::push(const q_element element, int type_queue)
             {
                 std::lock_guard<std::mutex> q_rsp_locker(rsp_mutex);
                 rsp.push(element);
+                break;
+            };
+            case Q_RECV:
+            {
+                std::lock_guard<std::mutex> q_rsp_locker(recv_mutex);
+                recv.push(element);
                 break;
             };
         };
@@ -54,6 +60,15 @@ void msg_queue::clear(int type_queue)
                 };
                 break;
             };
+            case Q_RECV:
+            {
+                std::lock_guard<std::mutex> q_rsp_locker(recv_mutex);
+                while (!recv.empty())
+                {
+                    recv.pop();
+                };
+                break;
+            };
         };
     };
 };
@@ -80,6 +95,12 @@ void msg_queue::pop(int type_queue)
                 rsp.pop();
                 break;
             };
+            case Q_RECV:
+            {
+                std::lock_guard<std::mutex> q_rsp_locker(recv_mutex);
+                recv.pop();
+                break;
+            };
         };
     };
 };
@@ -104,6 +125,11 @@ bool msg_queue::is_empty(int type_queue)
             {
                 std::lock_guard<std::mutex> q_rsp_locker(rsp_mutex);
                 return rsp.empty();
+            };
+            case Q_RECV:
+            {
+                std::lock_guard<std::mutex> q_rsp_locker(recv_mutex);
+                return recv.empty();
             };
         };
         return false;
@@ -132,6 +158,12 @@ q_element msg_queue::get(int type_queue)
             {
                 std::lock_guard<std::mutex> q_rsp_locker(rsp_mutex);
                 element = rsp.front();
+                break;
+            };
+            case Q_RECV:
+            {
+                std::lock_guard<std::mutex> q_rsp_locker(recv_mutex);
+                element = recv.front();
                 break;
             };
         };
