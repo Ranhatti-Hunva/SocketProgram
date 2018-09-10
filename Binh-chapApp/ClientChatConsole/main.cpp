@@ -18,7 +18,7 @@
 #include <sys/types.h>
 #include <map>
 //---------------------------------------------------------------------------------------
-#define HOST "10.42.0.126"
+#define HOST "localhost"
 #define PORT "8096"
 #define TIME_OUT 10
 #define MAX_FILE_TXT 1024
@@ -49,10 +49,11 @@ void recvMsg(unsigned char *buf,int sockfd,std::vector<timeoutSend>&timeoutQ){
 
 
         if(bytesRecv >0){
+            //printf("vao \n");
             struct msg_text msg_get;
             struct msg_text msg_rsp;
             HandleMsg handleMsg;
-
+            //std::cout<<"bytes recv "<<bytesRecv<<"\n";
             std::vector<unsigned char> buffer;
             buffer.insert(buffer.end(),&buf[0],&buf[bytesRecv]);
 
@@ -64,7 +65,11 @@ void recvMsg(unsigned char *buf,int sockfd,std::vector<timeoutSend>&timeoutQ){
             //bool is_success = handleMsg.unpacked_msg(msg_get, buf, bytesRecv);
             while(buffer.size()>0){
                 bool is_success = handleMsg.unpacked_msg(msg_get,buffer);
-                if(!is_success){
+                if(!is_success && (buffer.size() > 0)){
+//                    printf("vao \n");
+                    for(int i = 0; i < buffer.size();i++){
+                        printf(" %d ",buffer[i]);
+                    }
                     break;
                 }
                 else{
@@ -94,7 +99,9 @@ void recvMsg(unsigned char *buf,int sockfd,std::vector<timeoutSend>&timeoutQ){
                     }
                     if(msg_get.type_msg == RSP){
                         //std::cout << "id rps> " << msg_get.ID << std::endl;
+
                         usleep(1000);
+
                         mtx.lock();
                         std::vector<timeoutSend>::iterator it;
                         // tim va xoa msg trong Q timeout khi nhan respond
@@ -209,18 +216,18 @@ void cinFromConsole(int socket,std::queue<msg_text>&msgQ,std::vector<fileNode>&f
 
 
     //std::to_string(42);
-    /*//test 1000 msg/s
-    sleep(10);
-    for(int i = 0;i <1000; i++){
-        msgSend.type_msg = MSG;
-        msgSend.msg.assign("all/hello "+std::to_string(i));
-        mtx.lock();
-        msgQ.push(msgSend);
-        usleep(1000);//1ms
-        mtx.unlock();
+    //test 1000 msg/s
+//    sleep(15);
+//    for(int i = 0;i <1000; i++){
+//        msgSend.type_msg = MSG;
+//        msgSend.msg.assign("all/hello "+std::to_string(i));
+//        mtx.lock();
+//        msgQ.push(msgSend);
+//        usleep(1000);//1ms
+//        mtx.unlock();
 
-    }
-*/
+//    }
+
     while(stop!=1){
         fd_set read;
         FD_ZERO(&read);
@@ -527,6 +534,7 @@ int main()
         if(socket > 0){
             //send name user to server for login
             int num = send(socket,buffer,sizeof(buffer),0);
+            //std::cout << "numsend "<< num << "\n";
             loginId = msgSend.ID;
 
             //socket non-blocking mode

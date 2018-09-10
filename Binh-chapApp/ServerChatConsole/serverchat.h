@@ -42,7 +42,8 @@
 //-----Class Modify------------------------------------------------------------
 class ServerChat
 {
-    //std::mutex client_mutext;
+    std::mutex mtx;
+
 protected:
 
 public:
@@ -54,14 +55,24 @@ public:
     bool listenSocket(int sock, int backLog);
     void *get_in_addr(struct sockaddr *sa);
     void cleanUp();
-    void clientQRecv(struct msg_text msgHandle, std::vector<clientNode> &clientList, std::vector<timeoutNode> &timeoutList);
+    void clientQRecv(struct msg_text msgHandle,
+                     std::vector<clientNode> &clientList,
+                     std::vector<timeoutNode> &timeoutList,
+                     std:: queue <sendNode> &qMsgSend);
     //std::vector<clientNode> client();
-    void timeoutThread(fd_set &fd,std::vector <clientNode> &clientList, std::vector <timeoutNode> &timeoutList);
-
+    void timeoutThread(std::vector <clientNode> &clientList, std::vector <timeoutNode> &timeoutList);
+    void recvData(int serverFd,
+                  std::queue<sendNode> &qMsgSend,
+                  std::vector<clientNode> &clientLst,
+                  ThreadPool &poolThread, std::vector<timeoutNode> &timeoutList);
+    void sendThread(std:: queue <sendNode> &qMsgSend);
 
 private:
+
+    std::vector<int> clientFds;
+
     long int timeOut = 20000;
-    fd_set listener; //listener file decriptor list
+    //fd_set listener; //listener file decriptor list
     fd_set read_fds; //temp file descritopr list for select
     int sockfd,fdmax, newfd; // sockfd socket file descriptor, listening onl sockfd
     // max number of connection on fdmax
@@ -91,7 +102,7 @@ private:
     int skExist = -1;
 
     char remoteIP[INET6_ADDRSTRLEN];
-    std::mutex mtx;
+
 };
 
 #endif // SERVERCHAT_H
