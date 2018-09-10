@@ -15,8 +15,9 @@ void splits_string(const std::string& subject, std::vector<std::string>& contain
     delete[] s;
 }
 
-void read_terminal(bool& end_connection, TCPclient& client_helper, msg_queue& msg_wts)
+void read_terminal(bool& end_connection, TCPclient& client_helper, msg_queue& msg_wts, thread_pool& threads)
 {
+    bool stop_read_file;
     while(!end_connection)
     {
         fd_set reader;
@@ -42,10 +43,11 @@ void read_terminal(bool& end_connection, TCPclient& client_helper, msg_queue& ms
                     {
                         end_connection = true;
                         is_error = false;
+                        stop_read_file = true;
                         break;
                     }
                     else
-                    {
+                    {                                              
                         // Packet msg and push to msg_send_queue
                         std::vector<std::string> container;
                         splits_string(user_cmd_str, container);
@@ -58,30 +60,12 @@ void read_terminal(bool& end_connection, TCPclient& client_helper, msg_queue& ms
                         {
                             if (!container[0].compare("file"))
                             {
-                                // Send from file
-                                vector<file_infor> new_files;
-
-                                new_files = getDirectoryFiles("../build-clientSocketTCP-Desktop_Qt_5_11_1_clang_64bit-Debug/filemsg", "txt");
-
-                                if(files.empty())
-                                {
-                                    for (unsigned long i=0; i< new_files.size(); i++)
-                                    {
-                                        push_file(new_files[i], client_helper, msg_wts, container[1]);
-                                    };
-                                }
-                                else
-                                {
-                                    for (unsigned long i=0; i< new_files.size(); i++)
-                                    {
-                                        if(is_wts(files, new_files[i]))
-                                        {
-                                            push_file(new_files[i], client_helper, msg_wts, container[1]);
-                                        };
-                                    };
-                                };
-
-                                files = new_files;
+                                stop_read_file = false;
+                                threads.enqueue(send_from_file, ref(stop_read_file), container[1], ref(client_helper), ref(msg_wts));
+                            }
+                            else if (!container[0].compare("un_file"))
+                            {
+                                stop_read_file = true;
                             }
                             else
                             {
@@ -191,8 +175,7 @@ bool is_wts(vector<file_infor> files_list, file_infor file)
 bool push_file(file_infor file, TCPclient& client_helper, msg_queue& msg_wts, string user_forward)
 {
     int fd;
-    off_t /*size_of_file,*/ bytes_readed;
-//    struct stat file_infor;
+    off_t bytes_readed;
     const int bufsize = 1024;
     char buffer[bufsize] = {0};
 
@@ -201,15 +184,6 @@ bool push_file(file_infor file, TCPclient& client_helper, msg_queue& msg_wts, st
         perror("=>open fail");
         return false;
     };
-
-//    if (stat(file.name.c_str(),&file_infor)==-1)
-//    {
-//        perror("stat fail");
-//        return false;
-//    }
-//    else
-//        size_of_file=file_infor.st_size;
-
     bytes_readed = read(fd,buffer,bufsize);
 
     while(bytes_readed)
@@ -222,13 +196,66 @@ bool push_file(file_infor file, TCPclient& client_helper, msg_queue& msg_wts, st
         client_helper.packed_msg(msg_send, element);
         msg_wts.push(element, Q_MSG);
 
-        cout << buffer << endl << endl;
+        memset(&buffer, 0, sizeof(buffer));
+
         bytes_readed = read(fd,buffer,bufsize);
     };
     close(fd);
     return true;
 };
 
+void send_from_file(bool& stop_read_file, const std::string user_forward, TCPclient& client_helper, msg_queue& msg_wts)
+{
+    // Send all file for the first time
+    vector<file_infor> files = getDirectoryFiles("../build-clientSocketTCP-Desktop_Qt_5_11_1_clang_64bit-Debug/filemsg", "txt");
+    for (unsigned long i=0; i< files.size(); i++)
+    {
+        push_file(files[i], client_helper, msg_wts, user_forward);
+    };
+
+    // Check change in foder and start resend file
+    const char *dirname = "../build-clientSocketTCP-Desktop_Qt_5_11_1_clang_64bit-Debug/filemsg/";
+    int kq = kqueue ();
+    int dirfd = open (dirname, O_RDONLY);
+
+    struct kevent direvent;
+    EV_SET (&direvent, dirfd, EVFILT_VNODE, EV_ADD | EV_CLEAR | EV_ENABLE,NOTE_WRITE, 0, (void *)dirname);
+
+    kevent(kq, &direvent, 1, nullptr, 0, nullptr);
+
+    struct timespec time_delay;
+    time_delay.tv_sec = 1;
+    time_delay.tv_nsec = 0;
+
+    while(!stop_read_file)
+    {
+        struct kevent change;
+        memset(&change, 0, sizeof(change));
+
+        if (kevent(kq, nullptr, 0, &change, 1, &time_delay) == -1)
+        {
+            // Erorr on kevent
+            stop_read_file = true;
+            break;
+        }
+        else if (change.udata != nullptr)
+        {
+            // There is something change in file foder.
+            vector<file_infor> new_files;
+
+            new_files = getDirectoryFiles("../build-clientSocketTCP-Desktop_Qt_5_11_1_clang_64bit-Debug/filemsg", "txt");
+
+            for (unsigned long i=0; i< new_files.size(); i++)
+            {
+                if(is_wts(files, new_files[i]))
+                {
+                    push_file(new_files[i], client_helper, msg_wts, user_forward);
+                };
+            };
+            files = new_files;
+        };
+    };
+}
 
 
 

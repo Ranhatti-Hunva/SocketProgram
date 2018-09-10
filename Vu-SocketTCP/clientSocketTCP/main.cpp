@@ -64,7 +64,7 @@ int main()
     while (!end_connection)
     {
         // Thread pool
-        thread_pool threads(4);
+        thread_pool threads(10);
 
         // Queue for the massages are wating to send.
         msg_queue msg_wts;
@@ -74,7 +74,7 @@ int main()
         int client_fd;
 
         // read terminal
-        threads.enqueue(read_terminal, ref(end_connection), ref(client_helper), ref(msg_wts));
+        threads.enqueue(read_terminal, ref(end_connection), ref(client_helper), ref(msg_wts), ref(threads));
 
         // Connection with timeout to server.
         while(!end_connection)
