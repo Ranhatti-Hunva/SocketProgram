@@ -58,10 +58,10 @@ int main()
         server_helper.timeout_clocker(end_connection, client_socket_list);
     });
 
-//    threads.enqueue([&]()
-//    {
-//        server_helper.buffer_analyser(end_connection, msg_wts, threads);
-//    });
+    threads.enqueue([&]()
+    {
+        server_helper.buffer_analyser(end_connection, msg_wts, client_socket_list, threads);
+    });
 
     while(!end_connection)
     {

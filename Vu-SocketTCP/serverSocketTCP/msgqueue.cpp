@@ -75,7 +75,7 @@ void msg_queue::clear(int type_queue)
 
 void msg_queue::pop(int type_queue)
 {
-    if (type_queue > 1)
+    if (type_queue > 2)
     {
         perror("=> Wrong type queue!");
     }

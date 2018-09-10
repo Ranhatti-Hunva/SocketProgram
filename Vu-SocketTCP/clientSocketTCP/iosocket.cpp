@@ -224,7 +224,6 @@ bool push_file(file_infor file, TCPclient& client_helper, msg_queue& msg_wts, st
 
         cout << buffer << endl << endl;
         bytes_readed = read(fd,buffer,bufsize);
-
     };
     close(fd);
     return true;
