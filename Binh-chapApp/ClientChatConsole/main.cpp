@@ -8,16 +8,20 @@
 #include <algorithm>    // std::find_if
 #include <vector>       // std::vector
 #include <memory>
-<<<<<<< HEAD
-//----------------------------------------------------------------------------
-#define HOST "localhost"
-#define PORT "1500"
-=======
+#include <dirent.h>
+#include <errno.h>
+#include <cstddef>        // std::size_t
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <map>
 //---------------------------------------------------------------------------------------
-#define HOST "localhost"
+#define HOST "10.42.0.126"
 #define PORT "8096"
->>>>>>> 9bfbd3a539a401fe153d32ca7395c0099c5064d7
 #define TIME_OUT 10
+#define MAX_FILE_TXT 1024
 //------------variable check-------------------------------------------------------------
 std::mutex mtx;
 int stop = 0;
@@ -133,24 +137,80 @@ void recvMsg(unsigned char *buf,int sockfd,std::vector<timeoutSend>&timeoutQ){
 
 
 }
+//------------struct file node-----------------------------------------------------------
+struct fileNode{
+    int id;
+    std::string filePath;
+    bool isSend;
+    time_t timeModify;
+};
 
+//------------get file name--------------------------------------------------------------
+int getdir (std::string dir, std::vector<std::string> &files)
+{
+    DIR *dp;
+    struct dirent *dirp;
+    if((dp  = opendir(dir.c_str())) == nullptr) {
+        std::cout << "Error(" << errno << ") opening " << dir << std::endl;
+        return errno;
+    }
+
+    while ((dirp = readdir(dp)) != nullptr) {
+        files.push_back(std::string(dirp->d_name));
+    }
+    closedir(dp);
+    return 0;
+}
+
+//------------add file to Q send---------------------------------------------------------
+void addFileList(std::vector<fileNode>&fileList,std::string fileName){
+    std::map<std::string,int> mapFile;
+    std::map<std::string,int>::iterator it;
+
+    for(int i = 0; i< MAX_FILE_TXT; i++){
+        if(fileList[i].id != -1){
+            mapFile.insert(std::pair<std::string,int>(fileList[i].filePath,fileList[i].id));
+        }
+    }
+    it = mapFile.find(fileName);
+    if (it != mapFile.end()){
+        //check time modify
+        int posFile = it->second;
+        struct stat attr;
+        stat(fileList[posFile].filePath.c_str(), &attr);
+        if(difftime(attr.st_mtime,fileList[posFile].timeModify) != 0){
+            fileList[posFile].isSend = false;
+            fileList[posFile].timeModify = attr.st_mtime; //update time
+        }
+    }
+    else{
+        //add new
+        int posFile = mapFile.size();
+        fileList[posFile].filePath.assign(fileName);
+        fileList[posFile].id = posFile;
+        fileList[posFile].isSend = false;
+        struct stat attr;
+        stat(fileList[posFile].filePath.c_str(), &attr);
+        fileList[posFile].timeModify = attr.st_mtime;
+    }
+
+}
 
 //----thread nhan tu console-------------------------------------------------------------
 
-void cinFromConsole(int socket,std::queue<msg_text>&msgQ){
+void cinFromConsole(int socket,std::queue<msg_text>&msgQ,std::vector<fileNode>&fileList){
     //int socket;std::queue<msg_text>msgQ;
 
+    std::string folderPath = "../readFile";
     msg_text msgSend;
-
-
     struct timeval tv;
     tv.tv_sec = 0;
     tv.tv_usec = 500000;
 
 
-   //std::to_string(42);
-/* test 1000 msg/s
-    //sleep(10);
+    //std::to_string(42);
+    /*//test 1000 msg/s
+    sleep(10);
     for(int i = 0;i <1000; i++){
         msgSend.type_msg = MSG;
         msgSend.msg.assign("all/hello "+std::to_string(i));
@@ -179,6 +239,64 @@ void cinFromConsole(int socket,std::queue<msg_text>&msgQ){
                 userInput.clear();
                 break;
             }
+            else if(strcmp(userInput.substr(0,4).c_str(),"file") == 0){
+                std::string dir;
+                dir.assign(folderPath);
+                std::vector<std::string> files = std::vector<std::string>();
+                getdir(dir,files);
+                for (unsigned int i = 0;i < files.size();i++) {
+
+                    std::size_t found = files[i].find_last_of(".");
+                    std::string txtExtension = files[i].substr(found+1,files[i].size());
+                    //cout<<a<<endl;
+                    if(strcmp(txtExtension.c_str(),"txt") == 0){
+
+                        std::string fullName = folderPath +'/'+files[i];
+
+                        std::cout<<fullName<<"\n";
+
+                        addFileList(fileList,fullName);
+                    }
+                }
+                //doc file and send
+                for(int i = 0; i < MAX_FILE_TXT; i++){
+                    if(fileList[i].id != -1 && fileList[i].isSend == false){
+                        std::cout << "content of file "
+                                  << fileList[i].filePath <<" will be send to ";
+                        std::cout << userInput.substr(5,userInput.size()) << "\n";
+                        std::string username = userInput.substr(5,userInput.size());
+
+                        std::ifstream ifs(fileList[i].filePath, std::ios::binary|std::ios::ate);
+                        std::ifstream::pos_type pos = ifs.tellg();
+                        ifs.seekg(0, std::ios::beg);
+                        int block = 1024;
+
+                        int numberBlock = (pos/block) + 1;
+                        std::cout<<"pos number  "<<pos<<"\n";
+                        std::cout<<"block number  "<<numberBlock<<"\n";
+                        for(int i = 0; i < numberBlock; i++){
+                            char *pChars = new char[block];
+                            memset(pChars,0,block);
+
+                            ifs.read(pChars,block);
+                            std::cout<<"block   "<< i << "-----------------\n"<<std::string(pChars,0,1024)<<"\n";
+                            msgSend.type_msg = MSG;
+                            msgSend.msg.assign(username + "/" +pChars);
+                            mtx.lock();
+                            //usleep(10000);
+                            msgQ.push(msgSend);
+                            mtx.unlock();
+                            delete []pChars;
+                        }
+                        ifs.close();
+
+                        fileList[i].isSend = true;
+                    }
+                }
+
+
+
+            }
             else if(userInput.size() >0){
 
                 msgSend.type_msg = MSG;
@@ -193,6 +311,8 @@ void cinFromConsole(int socket,std::queue<msg_text>&msgQ){
         }
     }
 }
+
+
 //------------thread send msg to server--------------------------------------------------
 void sendMsg(int socket,std::queue<msg_text>&msgQ,std::vector<timeoutSend>&timeoutQ){
     HandleMsg handleMsg;
@@ -360,8 +480,17 @@ int main()
     char statusBuf[10]; // buf status login
     std::string userInput;
     std::vector <timeoutSend> timeoutList;
+
+    std::vector<fileNode>fileLst(MAX_FILE_TXT);
+
     std:: queue <msg_text> qSend;
     bool reconnect = true;
+    //init file list
+    for(int i = 0; i < MAX_FILE_TXT; i++){
+        fileLst[i].id = -1;
+        fileLst[i].isSend = false;
+        fileLst[i].timeModify = 0;
+    }
 
     while(reconnect){
         stop = 0;
@@ -404,7 +533,7 @@ int main()
             fcntl(socket, F_SETFL, O_NONBLOCK);
             // main thread for send msg
             // press # for logout
-            std::thread cinConsoleThread(cinFromConsole,socket,ref(qSend));
+            std::thread cinConsoleThread(cinFromConsole,socket,ref(qSend),ref(fileLst));
             std::thread sendMsgThread(sendMsg,socket,ref(qSend),ref(timeoutList));
             std::thread recvThread(recvMsg,bufrcv,socket,ref(timeoutList));
             std::thread timeoutThr(timeoutThread,socket,ref(timeoutList),ref(qSend));
