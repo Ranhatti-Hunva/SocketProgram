@@ -12,7 +12,7 @@
 #include <vector>
 #include <handlemsg.h>
 #include <sys/time.h>
-
+#include "msgqueue.h"
 #include <netinet/in.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -29,17 +29,18 @@
 
 class ClientManage
 {
+    std::mutex bfSend;
 public:
     ClientManage();
     int mapClientWithSocket(std::vector <clientNode> &clientList,
                             int socketfd,
                             char * buf,
                             fd_set &fds,
-                            std:: queue <sendNode> &qMsgSend);
+                            std:: queue <sendNode> &qMsgSend, msgQueue &qSend);
     void sendMsgToClient(std::vector <clientNode> &clientList,
                          char *msg, int socketfd,
                          std::vector<timeoutNode> &timeoutList,
-                         std::queue<sendNode> &qMsgSend);
+                         std::queue<sendNode> &qMsgSend,msgQueue &qSend);
 private:
     //std::mutex mtx;
 };

@@ -12,7 +12,8 @@ ClientManage::ClientManage()
 //------login client---------------------------------------------------------------------
 int ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,
                                       int socketfd, char * buf, fd_set &fds,
-                                      std::queue<sendNode> &qMsgSend
+                                      std::queue<sendNode> &qMsgSend,
+                                      msgQueue &qSend
                                       ){
     bool flagCheck = false;
     HandleMsg handle;
@@ -98,11 +99,12 @@ int ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,
                         send(clientList[posClient].socketfd,buffer,sizeof(buffer),0);
 
 
-//                        sendNode node;
-//                        node.buf = buffer;
-//                        node.len = sizeof(buffer);
-//                        node.socket = clientList[posClient].socketfd;
-//                        node.msgID = msgSend.ID;
+                        sendNode node;
+                        node.buf = buffer;
+                        node.len = sizeof(buffer);
+                        node.socket = clientList[posClient].socketfd;
+                        node.msgID = msgSend.ID;
+                        qSend.pushQ(node);
 //                        qMsgSend.push(node);
 
 //                        std::cout<<"\nbeffor send\n";
@@ -166,7 +168,8 @@ int ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,
 void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
                                    char *msg, int socketfd,
                                    std::vector <timeoutNode> &timeoutList,
-                                   std:: queue <sendNode> &qMsgSend){
+                                   std:: queue <sendNode> &qMsgSend,
+                                   msgQueue &qSend){
 
 
     struct timeval tv;
@@ -240,22 +243,43 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
 
                     // dong goi truoc khi send
                     //send(clientList[i].socketfd ,buffer,sizeof(buffer),0);
+//                    std::lock_guard<std::mutex> q_send_locker(bfSend);
+//                    sendNode node;
+//                    node.buf = new unsigned char [sizeof(buffer)];
+//                    memset(node.buf,0,sizeof(buffer));
+//                    node.buf = buffer;
+//                    node.len = sizeof(buffer);
+//                    node.socket = clientList[i].socketfd;
+//                    node.msgID = msgSend.ID;
+                    send(clientList[i].socketfd,buffer,sizeof(buffer),0);
+                    //mt.lock();
+//                   qSend.pushQ(node);
 
-                    sendNode node;
-                    node.buf = buffer;
-                    node.len = sizeof(buffer);
-                    node.socket = clientList[i].socketfd;
-                    node.msgID = msgSend.ID;
-                    qMsgSend.push(node);
-                    //std::cout<<std::string(clientList[i].name,0,20)<<" lol ---- "<<qMsgSend.size()<<"\n";
+//                    while(!qSend.isEmpty()){
+//                        std::cout<<"\n -----------------------------\n" <<std::endl;
+//                        for(int i = 0; i <qSend.frontQ().len;i++){
+//                            std::cout<<qSend.frontQ().buf[i];
+//                        }
+//                        std::cout<<std::endl;
+//                        qSend.popQ();
+//                    }
+                    //qMsgSend.push(node);
+
+                    //mt.unlock();
+//                    std::cout<<"\nlolo  --- "<<qMsgSend.front().len<<"\n";
+//                    for(int i = 0; i < qMsgSend.front().len;i++){
+
+//                        printf("%c",qMsgSend.front().buf[i]);
+//                    }
+                    //std::cout<<"\nlolo \n" <<std::string(node.buf,0,2048)<<" lol ---- "<<qMsgSend.size()<<"\n";
                     //add Q timeout rsp
                     //mtx.lock();
-                    gettimeofday(&tv, nullptr);
-                    timeoutNode to;
-                    to.timeout = tv.tv_sec*1000 + tv.tv_usec/1000 ;
-                    to.msgID = msgSend.ID;
-                    to.socket = clientList[i].socketfd;
-                    timeoutList.push_back(to);
+//                    gettimeofday(&tv, nullptr);
+//                    timeoutNode to;
+//                    to.timeout = tv.tv_sec*1000 + tv.tv_usec/1000 ;
+//                    to.msgID = msgSend.ID;
+//                    to.socket = clientList[i].socketfd;
+//                    timeoutList.push_back(to);
                     //usleep(1000);
                     //mtx.unlock();
 
@@ -271,21 +295,25 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
                     //dam bao rsp se gui truoc msg trong truong hop client gui msg cho chinh no
                     //usleep(1000);
                     //send(clientList[posClient].socketfd ,buffer,sizeof(buffer),0);
-
-                    sendNode node;
-                    node.buf = buffer;
-                    node.len = sizeof(buffer);
-                    node.socket = clientList[posClient].socketfd;
-                    node.msgID = msgSend.ID;
-                    qMsgSend.push(node);
+//                    std::lock_guard<std::mutex> q_send_locker(bfSend);
+//                    sendNode node;
+//                    node.buf = new unsigned char [sizeof(buffer)];
+//                    memset(node.buf,0,sizeof(buffer));
+//                    node.buf = buffer;
+//                    node.len = sizeof(buffer);
+//                    node.socket = clientList[posClient].socketfd;
+//                    node.msgID = msgSend.ID;
+//                    qSend.pushQ(node);
+                    send(clientList[posClient].socketfd,buffer,sizeof(buffer),0);
+                    //qMsgSend.push(node);
 
                     //mtx.lock();
-                    gettimeofday(&tv, nullptr);
-                    timeoutNode to;
-                    to.timeout = tv.tv_sec*1000 + tv.tv_usec/1000 ;
-                    to.msgID = msgSend.ID;
-                    to.socket = clientList[posClient].socketfd;
-                    timeoutList.push_back(to);
+//                    gettimeofday(&tv, nullptr);
+//                    timeoutNode to;
+//                    to.timeout = tv.tv_sec*1000 + tv.tv_usec/1000 ;
+//                    to.msgID = msgSend.ID;
+//                    to.socket = clientList[posClient].socketfd;
+//                    timeoutList.push_back(to);
                     //usleep(100);
                     //mtx.unlock();
                 }

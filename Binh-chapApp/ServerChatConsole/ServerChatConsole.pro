@@ -7,11 +7,13 @@ SOURCES += \
         main.cpp \
     serverchat.cpp \
     clientmanage.cpp \
-    handlemsg.cpp
+    handlemsg.cpp \
+    msgqueue.cpp
 
 HEADERS += \
     serverchat.h \
     clientmanage.h \
     handlemsg.h \
     clientnode.h \
-    threadpool.h
+    threadpool.h \
+    msgqueue.h

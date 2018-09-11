@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
+#include "msgqueue.h"
 //-----------------------------------------------------------------------------
 #define HOST "localhost"
 #define PORT "8096"
@@ -23,7 +24,7 @@ int main()
     thread_pool poolThr{30};
     std::vector<timeoutNode> timeoutList;
     std::vector<clientNode> client(MAX_CLIENT);
-
+    msgQueue qSend;
     ServerChat server(HOST,PORT);
 
     server.initSet();
@@ -46,7 +47,7 @@ int main()
 
 
         poolThr.enqueue([&]{
-            server.sendThread(ref(qMsgSend));
+            server.sendThread(ref(qMsgSend),qSend);
         });
 
         poolThr.enqueue([&]{
@@ -54,7 +55,7 @@ int main()
         });
 
         while(1){
-            server.recvData(socket,ref(qMsgSend),ref(client),poolThr,ref(timeoutList));
+            server.recvData(socket,ref(qMsgSend),ref(client),poolThr,ref(timeoutList),qSend);
         }
 
         server.cleanUp();

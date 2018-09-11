@@ -27,6 +27,7 @@
 #include "clientmanage.h"
 #include "clientnode.h"
 #include "threadpool.h"
+#include "msgqueue.h"
 
 #define BACKLOG 100
 //#define MAX_CLIENT 50
@@ -58,14 +59,17 @@ public:
     void clientQRecv(struct msg_text msgHandle,
                      std::vector<clientNode> &clientList,
                      std::vector<timeoutNode> &timeoutList,
-                     std:: queue <sendNode> &qMsgSend);
+                     std:: queue <sendNode> &qMsgSend,
+                     msgQueue &qSend);
     //std::vector<clientNode> client();
     void timeoutThread(std::vector <clientNode> &clientList, std::vector <timeoutNode> &timeoutList);
     void recvData(int serverFd,
                   std::queue<sendNode> &qMsgSend,
                   std::vector<clientNode> &clientLst,
-                  thread_pool &poolThread, std::vector<timeoutNode> &timeoutList);
-    void sendThread(std:: queue <sendNode> &qMsgSend);
+                  thread_pool &poolThread, std::vector<timeoutNode> &timeoutList,
+                  msgQueue &qSend);
+    void sendThread(std:: queue <sendNode> &qMsgSend,
+                    msgQueue &qSend);
 
 private:
 
