@@ -53,11 +53,13 @@ OBJECTS_DIR   = ./
 SOURCES       = ../clientSocketTCP/main.cpp \
 		../clientSocketTCP/iosocket.cpp \
 		../clientSocketTCP/tcphelper.cpp \
-		../clientSocketTCP/msgqueue.cpp 
+		../clientSocketTCP/msgqueue.cpp \
+		../clientSocketTCP/md5.cpp 
 OBJECTS       = main.o \
 		iosocket.o \
 		tcphelper.o \
-		msgqueue.o
+		msgqueue.o \
+		md5.o
 DIST          = /Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/spec_pre.prf \
 		/Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/qdevice.pri \
 		/Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/device_config.prf \
@@ -224,10 +226,12 @@ DIST          = /Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/spec_pre.prf
 		../clientSocketTCP/clientSocketTCP.pro ../clientSocketTCP/iosocket.h \
 		../clientSocketTCP/tcphelper.h \
 		../clientSocketTCP/msgqueue.h \
-		../clientSocketTCP/threadpool.h ../clientSocketTCP/main.cpp \
+		../clientSocketTCP/threadpool.h \
+		../clientSocketTCP/md5.h ../clientSocketTCP/main.cpp \
 		../clientSocketTCP/iosocket.cpp \
 		../clientSocketTCP/tcphelper.cpp \
-		../clientSocketTCP/msgqueue.cpp
+		../clientSocketTCP/msgqueue.cpp \
+		../clientSocketTCP/md5.cpp
 QMAKE_TARGET  = clientSocketTCP
 DESTDIR       = 
 TARGET        = clientSocketTCP
@@ -590,8 +594,8 @@ distdir: FORCE
 	@test -d $(DISTDIR) || mkdir -p $(DISTDIR)
 	$(COPY_FILE) --parents $(DIST) $(DISTDIR)/
 	$(COPY_FILE) --parents /Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/data/dummy.cpp $(DISTDIR)/
-	$(COPY_FILE) --parents ../clientSocketTCP/iosocket.h ../clientSocketTCP/tcphelper.h ../clientSocketTCP/msgqueue.h ../clientSocketTCP/threadpool.h $(DISTDIR)/
-	$(COPY_FILE) --parents ../clientSocketTCP/main.cpp ../clientSocketTCP/iosocket.cpp ../clientSocketTCP/tcphelper.cpp ../clientSocketTCP/msgqueue.cpp $(DISTDIR)/
+	$(COPY_FILE) --parents ../clientSocketTCP/iosocket.h ../clientSocketTCP/tcphelper.h ../clientSocketTCP/msgqueue.h ../clientSocketTCP/threadpool.h ../clientSocketTCP/md5.h $(DISTDIR)/
+	$(COPY_FILE) --parents ../clientSocketTCP/main.cpp ../clientSocketTCP/iosocket.cpp ../clientSocketTCP/tcphelper.cpp ../clientSocketTCP/msgqueue.cpp ../clientSocketTCP/md5.cpp $(DISTDIR)/
 
 
 clean: compiler_clean 
@@ -650,7 +654,8 @@ main.o: ../clientSocketTCP/main.cpp ../clientSocketTCP/msgqueue.h \
 iosocket.o: ../clientSocketTCP/iosocket.cpp ../clientSocketTCP/iosocket.h \
 		../clientSocketTCP/msgqueue.h \
 		../clientSocketTCP/tcphelper.h \
-		../clientSocketTCP/threadpool.h
+		../clientSocketTCP/threadpool.h \
+		../clientSocketTCP/md5.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o iosocket.o ../clientSocketTCP/iosocket.cpp
 
 tcphelper.o: ../clientSocketTCP/tcphelper.cpp ../clientSocketTCP/tcphelper.h \
@@ -661,6 +666,9 @@ tcphelper.o: ../clientSocketTCP/tcphelper.cpp ../clientSocketTCP/tcphelper.h \
 
 msgqueue.o: ../clientSocketTCP/msgqueue.cpp ../clientSocketTCP/msgqueue.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o msgqueue.o ../clientSocketTCP/msgqueue.cpp
+
+md5.o: ../clientSocketTCP/md5.cpp ../clientSocketTCP/md5.h
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o md5.o ../clientSocketTCP/md5.cpp
 
 ####### Install
 

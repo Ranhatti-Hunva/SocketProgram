@@ -21,10 +21,9 @@ extern std::string user_name;
 struct file_infor
 {
     std::string name;
-    struct stat attr;
+    std::string hash_md5;
+//    struct stat attr;
 };
-
-static vector<file_infor> files;
 
 void splits_string(const std::string& subject, std::vector<std::string>& container);
 

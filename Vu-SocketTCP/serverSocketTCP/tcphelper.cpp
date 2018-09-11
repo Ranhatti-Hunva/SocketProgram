@@ -320,7 +320,7 @@ int TCPserver::recv_msg(int server_fd, client_list& client_socket_list, msg_queu
     return 0;
 };
 
-void TCPserver::process_on_buffer_recv(const msg_text msg_get, client_list& client_socket_list, const client_information host_msg, msg_queue& msg_wts)
+void TCPserver::process_on_buffer_recv(const msg_text msg_get, client_list& client_socket_list, const client_information* host_msg, msg_queue& msg_wts)
 {
     // Process
     if(RSP == msg_get.type_msg)
@@ -335,7 +335,7 @@ void TCPserver::process_on_buffer_recv(const msg_text msg_get, client_list& clie
         rsp.ID = msg_get.ID;
 
         q_element element;
-        element.socket_fd = host_msg.socket_fd;
+        element.socket_fd = host_msg->socket_fd;
         this -> packed_msg(rsp, element.content);
         msg_wts.push(element, Q_RSP);
 
@@ -344,14 +344,14 @@ void TCPserver::process_on_buffer_recv(const msg_text msg_get, client_list& clie
         {
         case PIG:
         {
-            std::cout << "=> Message PING - "<< static_cast<int>(msg_get.ID)<<" from client on socket: " << host_msg.socket_fd << std::endl;
+            std::cout << "=> Message PING - "<< static_cast<int>(msg_get.ID)<<" from client on socket: " << host_msg->socket_fd << std::endl;
             break;
         };
         case SGI:
         {
-            std::cout << "=> Message LOGIN - "<< static_cast<int>(msg_get.ID)<<" from client on socket " << host_msg.socket_fd << ":" << msg_get.msg <<std::endl;
-            int old_socket_fd = client_socket_list.set_user_name(host_msg.socket_fd,msg_get.msg.c_str());
-            if((old_socket_fd > 0) && (old_socket_fd != host_msg.socket_fd))
+            std::cout << "=> Message LOGIN - "<< static_cast<int>(msg_get.ID)<<" from client on socket " << host_msg->socket_fd << ":" << msg_get.msg <<std::endl;
+            int old_socket_fd = client_socket_list.set_user_name(host_msg->socket_fd,msg_get.msg.c_str());
+            if((old_socket_fd > 0) && (old_socket_fd != host_msg->socket_fd))
             {
                 std::unique_lock<std::mutex> locker(fd_set_mutex);
                 FD_CLR(old_socket_fd, &master);
@@ -383,7 +383,7 @@ void TCPserver::process_on_buffer_recv(const msg_text msg_get, client_list& clie
                         if(!msg_history.msg.empty())
                         {
                             q_element element;
-                            element.socket_fd = host_msg.socket_fd;
+                            element.socket_fd = host_msg->socket_fd;
                             this -> packed_msg(msg_history, element.content);
                             msg_wts.push(element, Q_MSG);
                             std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -406,7 +406,7 @@ void TCPserver::process_on_buffer_recv(const msg_text msg_get, client_list& clie
         };
         case MSG:
         {
-            printf("=> Message %d from client on socket %d : %s \n", static_cast<int>(msg_get.ID), host_msg.socket_fd, msg_get.msg.c_str());
+            printf("=> Message %d from client on socket %d : %s \n", static_cast<int>(msg_get.ID), host_msg->socket_fd, msg_get.msg.c_str());
             std::vector<std::string> container;
             splits_string(msg_get.msg, container);
 
@@ -425,7 +425,7 @@ void TCPserver::process_on_buffer_recv(const msg_text msg_get, client_list& clie
                     msg_trasnsfer.msg  = "Sorry,"+container[0]+" can't rely you right now!!";
 
                     q_element element;
-                    element.socket_fd = host_msg.socket_fd;
+                    element.socket_fd = host_msg->socket_fd;
                     this -> packed_msg(msg_trasnsfer, element.content);
                     msg_wts.push(element, Q_MSG);
 
@@ -434,7 +434,7 @@ void TCPserver::process_on_buffer_recv(const msg_text msg_get, client_list& clie
                     std::string nameof = "../build-serverSocketTCP-Desktop_Qt_5_11_1_clang_64bit-Debug/clientmsg/"+container[0]+".txt";
                     write_file.open(nameof, std::fstream::app);
 
-                    std::string str(host_msg.user_name);
+                    std::string str(host_msg->user_name);
 
                     write_file << str+">"+container[1]<< std::endl;
 
@@ -442,7 +442,7 @@ void TCPserver::process_on_buffer_recv(const msg_text msg_get, client_list& clie
                 }
                 else
                 {
-                    std::string str(host_msg.user_name);
+                    std::string str(host_msg->user_name);
                     msg_trasnsfer.msg = str+">"+container[1];
 
                     q_element element;
@@ -453,7 +453,7 @@ void TCPserver::process_on_buffer_recv(const msg_text msg_get, client_list& clie
             }
             else
             {
-                std::string str(host_msg.user_name);
+                std::string str(host_msg->user_name);
                 msg_trasnsfer.msg = str+">"+container[1];
 
                 for (unsigned long i=0; i< client_socket_list.size(); i++)
@@ -462,7 +462,7 @@ void TCPserver::process_on_buffer_recv(const msg_text msg_get, client_list& clie
                     client_information* forward_msg;
                     forward_msg = client_socket_list.get_by_order(i);
 
-                    if(forward_msg->socket_fd != host_msg.socket_fd)
+                    if(forward_msg->socket_fd != host_msg->socket_fd)
                     {
                         q_element element;
                         element.socket_fd =  forward_msg->socket_fd;
@@ -672,7 +672,7 @@ void TCPserver::buffer_analyser(bool& end_connection, msg_queue& msg_wts, client
                     {
                         threads.enqueue([=, &client_socket_list, &msg_wts]()
                         {
-                            this -> process_on_buffer_recv(msg_get, client_socket_list, *host_msg, msg_wts);
+                            this -> process_on_buffer_recv(msg_get, client_socket_list, host_msg, msg_wts);
                         });
                     };
                 };

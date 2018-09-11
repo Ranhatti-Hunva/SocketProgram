@@ -1,4 +1,5 @@
 #include "iosocket.h"
+#include "md5.h"
 
 // using to analyser user command.
 void splits_string(const std::string& subject, std::vector<std::string>& container)
@@ -15,6 +16,7 @@ void splits_string(const std::string& subject, std::vector<std::string>& contain
     delete[] s;
 }
 
+// Read terminal data from user
 void read_terminal(bool& end_connection, TCPclient& client_helper, msg_queue& msg_wts, thread_pool& threads)
 {
     bool stop_read_file;
@@ -83,8 +85,11 @@ void read_terminal(bool& end_connection, TCPclient& client_helper, msg_queue& ms
             };
         };
     };
+    stop_read_file = true;
+    usleep(1000);
 };
 
+// Confirm exit from  user
 bool is_reconnect(int& client_fd)
 {
     // Ask user if they want to reconnect with server after lose connection.
@@ -111,6 +116,7 @@ bool is_reconnect(int& client_fd)
     };
 };
 
+// Read data from file.
 std::vector<file_infor> getDirectoryFiles(const std::string& dir, const char* ext) {
   std::vector<file_infor> files;
   std::shared_ptr<DIR> directory_ptr(opendir(dir.c_str()), [](DIR* dir){ dir && closedir(dir); });
@@ -138,12 +144,37 @@ std::vector<file_infor> getDirectoryFiles(const std::string& dir, const char* ex
           {
               if(!strcmp(p,ext))
               {
+                 // Save file data
                  file_infor file;
                  file.name = dir + "/" + std::string(dirent_ptr->d_name)+".txt";
 
                  std::string path = file.name;
-                 stat(path.c_str(),&file.attr);
 
+                 // Get hash md5 of files.
+                 int fd;
+                 off_t bytes_readed;
+                 const int bufsize = 1024;
+                 char buffer[bufsize] = {0};
+                 string plaintext;
+
+                 if ((fd = open(file.name.c_str(),O_RDONLY))==-1)
+                 {
+                     perror("=>open fail");
+                     files.clear();
+                     return files;
+                 };
+
+                 bytes_readed = read(fd,buffer,bufsize);
+                 plaintext.clear();
+
+                 while(bytes_readed)
+                 {
+                     plaintext.append(buffer);
+                     memset(&buffer, 0, sizeof(buffer));
+                     bytes_readed = read(fd,buffer,bufsize);
+                 };
+
+                 file.hash_md5 = md5(plaintext);
                  files.push_back(file);
               };
           };
@@ -159,7 +190,7 @@ bool is_wts(vector<file_infor> files_list, file_infor file)
     {
         if(files_list[i].name ==  file.name)
         {
-            if(file.attr.st_mtime != files_list[i].attr.st_mtime)
+            if(file.hash_md5.compare(files_list[i].hash_md5))
             {
                 return true;
             }
@@ -256,12 +287,3 @@ void send_from_file(bool& stop_read_file, const std::string user_forward, TCPcli
         };
     };
 }
-
-
-
-
-
-
-
-
-

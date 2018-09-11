@@ -18,7 +18,8 @@ SOURCES += \
         main.cpp \
     iosocket.cpp \
     tcphelper.cpp \
-    msgqueue.cpp
+    msgqueue.cpp \
+    md5.cpp
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
@@ -29,4 +30,5 @@ HEADERS += \
     iosocket.h \
     tcphelper.h \
     msgqueue.h \
-    threadpool.h
+    threadpool.h \
+    md5.h
