@@ -23,6 +23,14 @@ struct msg_text
     int socketfd = -1;
 };
 
+struct sendNode
+{
+    int socket;
+    unsigned char * buf;
+    int len;
+    int msgID;
+};
+
 class HandleMsg
 {
 public:    

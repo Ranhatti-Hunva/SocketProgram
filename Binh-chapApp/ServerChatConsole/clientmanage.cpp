@@ -11,7 +11,9 @@ ClientManage::ClientManage()
 }
 //------login client---------------------------------------------------------------------
 int ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,
-                                      int socketfd, char * buf, fd_set &fds){
+                                      int socketfd, char * buf, fd_set &fds,
+                                      std::queue<sendNode> &qMsgSend
+                                      ){
     bool flagCheck = false;
     HandleMsg handle;
     int socketExist = -1;
@@ -51,11 +53,11 @@ int ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,
 
             clientList[posClient].status = true;
             clientList[posClient].socketfd = socketfd;
-            usleep(1000);
+            //usleep(1000);
             std::ifstream infile;
             char * filename = new char[strlen(clientList[posClient].name)];
             strcpy(filename,clientList[posClient].name);
-            //std::string e;
+
             infile.open(strcat(filename,".txt"));
 
             if(infile.is_open() == true){
@@ -74,12 +76,17 @@ int ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,
                         handleMsg.packed_msg(msgSend,buffer);
 
                         //usleep(1000);
-                        send(clientList[posClient].socketfd,buffer,sizeof(buffer),0);
-
+                        //send(clientList[posClient].socketfd,buffer,sizeof(buffer),0);
+                        sendNode node;
+                        node.buf = buffer;
+                        node.len = sizeof(buffer);
+                        node.socket = clientList[posClient].socketfd;
+                        node.msgID = msgSend.ID;
+                        qMsgSend.push(node);
+                        std::cout<<"len "<<node.len<<"\n";
                         std::cout<<line<<"\n";
                     }
 
-                    //delete []a;
                 }
                 infile.close();
                 std::ofstream ofs;
@@ -89,6 +96,9 @@ int ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,
         }
         else{
             flagCheck = true;
+            //mtx.lock();
+            //close(clientList[posClient].socketfd);
+            //mtx.unlock();
             socketExist = clientList[posClient].socketfd;
             clientList[posClient].socketfd = socketfd;
         }
@@ -121,7 +131,8 @@ int ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,
 
 void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
                                    char *msg, int socketfd,
-                                   std::vector <timeoutNode> &timeoutList){
+                                   std::vector <timeoutNode> &timeoutList,
+                                   std:: queue <sendNode> &qMsgSend){
 
 
     struct timeval tv;
@@ -188,21 +199,29 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
         HandleMsg handleMsg;
         handleMsg.packed_msg(msgSend,buffer);
 
-
+        int count = 0;
         if(strcmp(nameClient,"all")==0){
             for(int i = 0; i < MAX_CLIENT ; i++){
                 if(clientList[i].status == true && clientList[i].socketfd != socketfd){
 
                     // dong goi truoc khi send
-                    send(clientList[i].socketfd ,buffer,sizeof(buffer),0);
+                    //send(clientList[i].socketfd ,buffer,sizeof(buffer),0);
+
+                    sendNode node;
+                    node.buf = buffer;
+                    node.len = sizeof(buffer);
+                    node.socket = clientList[i].socketfd;
+                    node.msgID = msgSend.ID;
+                    qMsgSend.push(node);
+                    //std::cout<<std::string(clientList[i].name,0,20)<<" lol ---- "<<qMsgSend.size()<<"\n";
                     //add Q timeout rsp
                     //mtx.lock();
-                    gettimeofday(&tv, nullptr);
-                    timeoutNode to;
-                    to.timeout = tv.tv_sec*1000 + tv.tv_usec/1000 ;
-                    to.msgID = msgSend.ID;
-                    to.socket = clientList[i].socketfd;
-                    timeoutList.push_back(to);
+//                    gettimeofday(&tv, nullptr);
+//                    timeoutNode to;
+//                    to.timeout = tv.tv_sec*1000 + tv.tv_usec/1000 ;
+//                    to.msgID = msgSend.ID;
+//                    to.socket = clientList[i].socketfd;
+//                    timeoutList.push_back(to);
                     //usleep(1000);
                     //mtx.unlock();
 
@@ -217,15 +236,22 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
                 if(clientList[posClient].status == true){
                     //dam bao rsp se gui truoc msg trong truong hop client gui msg cho chinh no
                     //usleep(1000);
-                    send(clientList[posClient].socketfd ,buffer,sizeof(buffer),0);
+                    //send(clientList[posClient].socketfd ,buffer,sizeof(buffer),0);
+
+                    sendNode node;
+                    node.buf = buffer;
+                    node.len = sizeof(buffer);
+                    node.socket = clientList[posClient].socketfd;
+                    node.msgID = msgSend.ID;
+                    qMsgSend.push(node);
 
                     //mtx.lock();
-                    gettimeofday(&tv, nullptr);
-                    timeoutNode to;
-                    to.timeout = tv.tv_sec*1000 + tv.tv_usec/1000 ;
-                    to.msgID = msgSend.ID;
-                    to.socket = clientList[posClient].socketfd;
-                    timeoutList.push_back(to);
+//                    gettimeofday(&tv, nullptr);
+//                    timeoutNode to;
+//                    to.timeout = tv.tv_sec*1000 + tv.tv_usec/1000 ;
+//                    to.msgID = msgSend.ID;
+//                    to.socket = clientList[posClient].socketfd;
+//                    timeoutList.push_back(to);
                     //usleep(100);
                     //mtx.unlock();
                 }

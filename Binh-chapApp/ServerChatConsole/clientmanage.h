@@ -32,10 +32,16 @@ class ClientManage
 public:
     ClientManage();
     int mapClientWithSocket(std::vector <clientNode> &clientList,
-                            int socketfd, char * buf, fd_set &fds);
-    void sendMsgToClient(std::vector <clientNode> &clientList, char *msg, int socketfd, std::vector<timeoutNode> &timeoutList);
+                            int socketfd,
+                            char * buf,
+                            fd_set &fds,
+                            std:: queue <sendNode> &qMsgSend);
+    void sendMsgToClient(std::vector <clientNode> &clientList,
+                         char *msg, int socketfd,
+                         std::vector<timeoutNode> &timeoutList,
+                         std::queue<sendNode> &qMsgSend);
 private:
-    std::mutex mtx;
+    //std::mutex mtx;
 };
 
 #endif // CLIENTMANAGE_H

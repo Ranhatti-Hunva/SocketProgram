@@ -48,7 +48,10 @@ int ServerChat::createSocket(){
 
         break;
     }
-
+    this->fdmax = sockfd;
+    FD_ZERO(&read_fds);
+    //FD_ZERO(&read_fds);
+    FD_SET(sockfd, &read_fds);
     freeaddrinfo(servinfo);
 
     if (p == nullptr){
@@ -66,11 +69,46 @@ bool ServerChat::listenSocket(int sock, int backLog){
     return true;
 }
 //---------------------------------------------------------------------------------------
+
+void ServerChat::sendThread(std:: queue <sendNode> &qMsgSend){
+    while(1){
+        if(!qMsgSend.empty()){
+
+            fd_set sendFds;
+            FD_ZERO(&sendFds);
+            FD_SET(qMsgSend.front().socket,&sendFds);
+            //selet null???
+            if (select(qMsgSend.front().socket+1,nullptr, &sendFds, nullptr, nullptr) <0){
+                perror("Error with select on this socket");
+            }
+
+            if(FD_ISSET(qMsgSend.front().socket, &sendFds)){
+                long int numSend = send(qMsgSend.front().socket,
+                                        qMsgSend.front().buf,
+                                        qMsgSend.front().len,0);
+                if(numSend < 0){
+                    perror("send :");
+                }
+                std::cout<<"\nlbi  --- "<<qMsgSend.front().len<<"\n";
+                for(int i = 0; i < qMsgSend.front().len;i++){
+                    printf(" %d ",qMsgSend.front().buf[i]);
+                }
+                qMsgSend.pop();
+            }
+
+
+        }
+    }
+}
+
+//---------------------------------------------------------------------------------------
 void ServerChat::clientQRecv(struct msg_text msgHandle,
                              std::vector <clientNode> &clientList,
-                             std::vector <timeoutNode> &timeoutList){
+                             std::vector <timeoutNode> &timeoutList,
+                             std:: queue <sendNode> &qMsgSend
+                             ){
     ClientManage cliManage;
-
+    std::mutex a;
     //std::unique_ptr<char> msgbuf(new char[2048]);
     char *msgbuf = new char[msgHandle.msg.size()];
 
@@ -79,8 +117,14 @@ void ServerChat::clientQRecv(struct msg_text msgHandle,
 
     switch(msgHandle.type_msg){
     case SGI:
-        skExist = cliManage.mapClientWithSocket(clientList,msgHandle.socketfd,msgbuf,listener);
-
+        skExist = cliManage.mapClientWithSocket(clientList,msgHandle.socketfd,msgbuf,read_fds,ref(qMsgSend));
+//        if(skExist != -1){
+//            mtx.lock();
+//            close(skExist);
+//            FD_CLR(skExist,&read_fds);
+//            skExist = -1;
+//            mtx.unlock();
+//        }
         for(int i = 0 ; i < MAX_CLIENT ; i++){
             if(clientList[i].status == true){
                 std::cout<<"Name client online "<< std::string(clientList[i].name,0,20) <<" socket "<< clientList[i].socketfd<<"\n";
@@ -91,8 +135,9 @@ void ServerChat::clientQRecv(struct msg_text msgHandle,
         }
         break;
 
-    case MSG:        
-        cliManage.sendMsgToClient(clientList,msgbuf,msgHandle.socketfd,timeoutList);
+    case MSG:
+        //push msg will send (msg, socket)
+        cliManage.sendMsgToClient(clientList,msgbuf,msgHandle.socketfd,timeoutList,qMsgSend);
         break;
     case RSP:
         //mtx.lock();
@@ -104,10 +149,6 @@ void ServerChat::clientQRecv(struct msg_text msgHandle,
             });
             if (it != timeoutList.end()){
                 timeoutList.erase(it);
-//                it = std::find_if(timeoutList.begin(),timeoutList.end(),
-//                                  [=] (timeoutNode const& f) {
-//                    return ((f.socket == msgHandle.socketfd));
-//                });
             }
         }
         //mtx.unlock();
@@ -115,11 +156,10 @@ void ServerChat::clientQRecv(struct msg_text msgHandle,
         //find and erase msg in timeout list
         break;
     }
-    //delete [] msgbuf;
+    delete [] msgbuf;
 }
 //---------------------------------------------------------------------------------------
-void ServerChat::timeoutThread(fd_set &fd,
-                               std::vector <clientNode> &clientList,
+void ServerChat::timeoutThread(std::vector <clientNode> &clientList,
                                std::vector <timeoutNode> &timeoutList){
     struct timeval tp;
     while(1){
@@ -130,7 +170,7 @@ void ServerChat::timeoutThread(fd_set &fd,
                 //std::cout << "co vao hehe\n";
                 std::cout<<"client timeout!!! ";
                 std::cout<<"socket "<<timeoutList.front().socket<<" msg ID "<<
-                        timeoutList.front().msgID<<"\n";
+                           timeoutList.front().msgID<<"\n";
                 //close clear from fd off client;
                 for(int i = 0; i<MAX_CLIENT;i++){
                     if((clientList[i].status == true)&&
@@ -139,7 +179,7 @@ void ServerChat::timeoutThread(fd_set &fd,
                         break;
                     }
                 }
-                FD_CLR(timeoutList.front().socket,&fd);
+                FD_CLR(timeoutList.front().socket,&read_fds);
                 timeoutList.erase(timeoutList.begin());
             }
         }
@@ -161,6 +201,147 @@ void clientQSend(struct msg_text msgHandle){
     default:
         break;
     }
+}
+//---------------------------------------------------------------------------------------
+
+void ServerChat::recvData(int serverFd,
+                          std:: queue <sendNode> &qMsgSend,
+                          std::vector<clientNode> &clientLst,
+                          ThreadPool &poolThread,
+                          std::vector<timeoutNode> &timeoutList){
+    //    FD_ZERO(&listener);
+    //    //FD_ZERO(&read_fds);
+    //    FD_SET(serverFd, &listener);
+    //fdmax = serverFd;
+
+    //read_fds = listener;
+    fd_set listener = this->read_fds;
+    struct timeval tv;
+    tv.tv_usec = 10000;
+    tv.tv_sec = 1;
+
+    std::unique_lock<std::mutex> locker(mtx);
+
+    //std::cout<<"fdmax "<<select(this->fdmax+1,&listener, nullptr,nullptr,&tv) << "\n";
+
+    if(select(this->fdmax+1,&listener, nullptr,nullptr,&tv) == -1){
+        perror("select");
+        exit(1);
+    }
+    locker.unlock();
+
+    if(FD_ISSET(serverFd,&listener)){
+
+        addrlen = sizeof remoteaddr;
+        newfd = accept(sockfd,(struct sockaddr *)&remoteaddr,&addrlen);
+        if(newfd == -1){
+            perror("accept");
+        } else {
+
+            std::unique_lock<std::mutex> locker(mtx);
+            FD_SET(newfd,&read_fds);
+            //add socket to clientFds list
+            clientFds.push_back(newfd);
+            locker.unlock();
+
+            long arg = fcntl(newfd, F_GETFL, NULL);
+            arg |= O_NONBLOCK;
+            fcntl(newfd, F_SETFL, arg);
+
+
+            // assign fdmax = socket of newfd
+            if( newfd > this->fdmax){
+                this->fdmax = newfd;
+            }
+
+
+            const char * network_name = inet_ntop(remoteaddr.ss_family,
+                                                  get_in_addr((struct sockaddr*)&remoteaddr)
+                                                  ,remoteIP,INET6_ADDRSTRLEN);
+            std::cout <<"\nnew connection from " << network_name <<
+                        " on socket" << newfd << "\n";
+
+        }
+    }
+
+    for(int i = 0 ; i < clientFds.size();i++){
+        if(FD_ISSET(clientFds[i],&listener)){
+            //std::cout<<"client id "<<clientFds[i]<<"\n";
+            std::unique_ptr<unsigned char> buf (new unsigned char[2048]);
+            //unsigned char buf[2048];
+
+            if((nbytes = recv(clientFds[i],buf.get(),2048,0))<=0){
+
+
+                if ((nbytes == -1) && ((errno == EAGAIN)|| (errno == EWOULDBLOCK))){
+                    perror("=> Message is not gotten complete !!");
+                }
+                if(nbytes == 0){
+                    // close connect
+                    // chuyen trang thai stt sang offline
+                    for(int j = 0 ; j < MAX_CLIENT ; j++){
+                        if(clientLst[j].socketfd == clientFds[i] && clientLst[j].status == true){
+                            clientLst[j].status = false;
+                            break;
+                        }
+                    }
+                    std::cout << "socket "<< clientFds[i] << " closed\n";
+                    close(clientFds[i]);
+                    FD_CLR(clientFds[i],&read_fds);
+                }
+
+            }
+            else{
+
+                std::vector<unsigned char> buffer;
+                buffer.insert(buffer.end(),&buf.get()[0],&buf.get()[nbytes]);
+
+                while(buffer.size()>0){
+
+
+                    msg_text recvMsg,rspMsg;
+                    recvMsg.socketfd = clientFds[i];
+                    bool is_success = handlMsg.unpacked_msg(recvMsg,buffer);
+
+                    if(!is_success){
+                        break;
+                    }
+                    else{
+                        //enQ thread pool
+                        if(recvMsg.type_msg != RSP){
+
+                            rspMsg.ID = recvMsg.ID;
+                            rspMsg.type_msg = RSP;
+                            rspMsg.socketfd = clientFds[i];
+                            poolThread.enqueue([rspMsg]{
+                                clientQSend(rspMsg);
+                            });
+                        }
+                        //sleep(1);
+                        if(recvMsg.type_msg == SGI){
+                            clientQRecv(recvMsg,clientLst,timeoutList,qMsgSend);
+                            if(skExist != -1){
+                                mtx.lock();
+                                close(skExist);
+                                FD_CLR(skExist,&read_fds);
+                                skExist = -1;
+                                mtx.unlock();
+                            }
+                        }
+                        else{
+                            poolThread.enqueue([&,recvMsg]{
+                                clientQRecv(recvMsg,clientLst,timeoutList,qMsgSend);
+                            });
+                        }
+
+
+                    }
+                }//end while
+
+            }
+        }
+    }
+
 }
 
 
@@ -184,9 +365,9 @@ void ServerChat::mainLoop(){
     std::vector<timeoutNode> timeoutList;
 
 
-    FD_ZERO(&listener);
+    //FD_ZERO(&listener);
     FD_ZERO(&read_fds);
-    FD_SET(sockfd, &listener);
+    //FD_SET(sockfd, &listener);
 
     fdmax = sockfd;
     int flag = 0;
@@ -201,15 +382,15 @@ void ServerChat::mainLoop(){
         client[i].socketfd = -1;
         client[i].id = -1;
     }
-    //clientNode clientTemp[1];
-    int clientSocket = -1;
+
+
     // thread timeout
-    pool.enqueue([&]{
-        timeoutThread(listener,client,timeoutList);
-    });
+    //    pool.enqueue([&]{
+    //        timeoutThread(listener,client,timeoutList);
+    //    });
     //thread main
     while(1){
-        read_fds = listener;
+        //read_fds = listener;
 
         if(select(fdmax+1,&read_fds, nullptr,nullptr,nullptr) == -1){
             perror("select");
@@ -231,7 +412,7 @@ void ServerChat::mainLoop(){
                     } else {
 
                         flag = 1;
-                        FD_SET(newfd,&listener);
+                        //FD_SET(newfd,&listener);
 
                         // assign fdmax = socket of newfd
                         if( newfd > fdmax){
@@ -243,7 +424,6 @@ void ServerChat::mainLoop(){
                         std::cout <<"\nnew connection from " << network_name <<
                                     " on socket" << newfd << "\n";
 
-                        clientSocket = newfd;
                     }
                 } else {
                     // handling data from client
@@ -266,7 +446,7 @@ void ServerChat::mainLoop(){
                             perror("revc");
                         }
                         close(i);
-                        FD_CLR(i,&listener);
+                        //FD_CLR(i,&listener);
 
                     }
 
@@ -316,11 +496,11 @@ void ServerChat::mainLoop(){
                                     rspMsg.socketfd = i;
                                     clientQSend(rspMsg);
                                     usleep(1000);//1ms
-                                    clientQRecv(recvMsg,client,timeoutList);
+                                    //clientQRecv(recvMsg,client,timeoutList);
                                     if(skExist != -1){
                                         mtx.lock();
                                         close(skExist);
-                                        FD_CLR(skExist,&listener);
+                                        //  FD_CLR(skExist,&listener);
                                         skExist = -1;
                                         mtx.unlock();
 
@@ -349,7 +529,7 @@ void ServerChat::mainLoop(){
 
                                 //delete[] buf;
                             }
-                        }
+                        }//end while
                     }
                 }
             }
@@ -362,7 +542,7 @@ void ServerChat::mainLoop(){
             qMsg.socketfd = qRecv.front().socketfd;
 
             pool.enqueue([&,qMsg]{
-                clientQRecv(qMsg,client,timeoutList);
+                // clientQRecv(qMsg,client,timeoutList);
             });
 
             qRecv.pop();
@@ -375,7 +555,7 @@ void ServerChat::mainLoop(){
             qMsg.socketfd = qSend.front().socketfd;
             // sleep(6); //test timeout
             pool.enqueue([qMsg]{
-                clientQSend(qMsg);
+                // clientQSend(qMsg);
             });
             qSend.pop();
         }
