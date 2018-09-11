@@ -1,6 +1,8 @@
 #include "tcphelper.h"
 #include "iosocket.h"
 
+static std::mutex log_mutex;
+
 // TCPhelper contructor, menthod, .....
 void ultoc(unsigned int& ul, unsigned char* cu)
 {
@@ -256,7 +258,11 @@ int TCPserver::acceptor(int server_fd, client_list& client_socket_list)
         // Show client information to terminal
         char IPclient[INET6_ADDRSTRLEN];
         inet_ntop(client_addr.sa_family,&(reinterpret_cast<struct sockaddr_in* >(&client_addr)->sin_addr),IPclient, INET6_ADDRSTRLEN);
-        printf("=> New conection from %s on socket %d\n",IPclient,client_socket);
+
+//        {
+//            std::unique_lock<std::mutex> log_log(log_mutex);
+//            printf("=> New conection from %s on socket %d\n",IPclient,client_socket);
+//        };
     };
     return client_socket;
 };
@@ -303,7 +309,7 @@ int TCPserver::recv_msg(int server_fd, client_list& client_socket_list, msg_queu
                     }
                     else
                     {
-                        printf("=> Error socket.");
+                        printf("=> Error socket.\n");
                     };
                     this->closer(this->client_fds[i], client_socket_list);
                 };
@@ -344,12 +350,17 @@ void TCPserver::process_on_buffer_recv(const msg_text msg_get, client_list& clie
         {
         case PIG:
         {
+            std::unique_lock<std::mutex> log_log(log_mutex);
             std::cout << "=> Message PING - "<< static_cast<int>(msg_get.ID)<<" from client on socket: " << host_msg->socket_fd << std::endl;
             break;
         };
         case SGI:
         {
-            std::cout << "=> Message LOGIN - "<< static_cast<int>(msg_get.ID)<<" from client on socket " << host_msg->socket_fd << ":" << msg_get.msg <<std::endl;
+            {
+                std::unique_lock<std::mutex> log_log(log_mutex);
+                std::cout << "=> Message LOGIN - "<< static_cast<int>(msg_get.ID)<<" from client on socket " << host_msg->socket_fd << ":" << msg_get.msg <<std::endl;
+            };
+
             int old_socket_fd = client_socket_list.set_user_name(host_msg->socket_fd,msg_get.msg.c_str());
             if((old_socket_fd > 0) && (old_socket_fd != host_msg->socket_fd))
             {
@@ -393,12 +404,12 @@ void TCPserver::process_on_buffer_recv(const msg_text msg_get, client_list& clie
 
                     if( remove( nameof.c_str() ) != 0 )
                         perror( "=> Error deleting file \n" );
-                    else
-                        printf( "=> File history successfully deleted \n" );
+//                    else
+//                        printf( "=> File history successfully deleted \n" );
                 }
                 else
                 {
-                    printf("=> History msg of this client is clear!! \n");
+//                    printf("=> History msg of this client is clear!! \n");
                     read_file.close();
                 };
             };
@@ -406,7 +417,11 @@ void TCPserver::process_on_buffer_recv(const msg_text msg_get, client_list& clie
         };
         case MSG:
         {
-            printf("=> Message %d from client on socket %d : %s \n", static_cast<int>(msg_get.ID), host_msg->socket_fd, msg_get.msg.c_str());
+            {
+                std::unique_lock<std::mutex> log_log(log_mutex);
+                printf("=> Message %d from client on socket %d : %s \n", static_cast<int>(msg_get.ID), host_msg->socket_fd, msg_get.msg.c_str());
+            };
+
             std::vector<std::string> container;
             splits_string(msg_get.msg, container);
 
