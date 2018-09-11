@@ -64,7 +64,7 @@ public:
     void recvData(int serverFd,
                   std::queue<sendNode> &qMsgSend,
                   std::vector<clientNode> &clientLst,
-                  ThreadPool &poolThread, std::vector<timeoutNode> &timeoutList);
+                  thread_pool &poolThread, std::vector<timeoutNode> &timeoutList);
     void sendThread(std:: queue <sendNode> &qMsgSend);
 
 private:
@@ -78,7 +78,7 @@ private:
     // max number of connection on fdmax
     // new file descritor
     //std:: queue <struct msg_>  qRecv;
-    ThreadPool pool{30};
+    thread_pool pool{30};
 
     std:: queue <struct msg_text> qRecv;
     std:: queue <struct msg_text> qSend;

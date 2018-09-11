@@ -20,7 +20,7 @@ void initClientList(std::vector<clientNode> &clientLst){
 int main()
 {
     std:: queue <sendNode> qMsgSend;
-    ThreadPool poolThr{30};
+    thread_pool poolThr{30};
     std::vector<timeoutNode> timeoutList;
     std::vector<clientNode> client(MAX_CLIENT);
 
@@ -46,11 +46,11 @@ int main()
 
 
         poolThr.enqueue([&]{
-            server.sendThread(qMsgSend);
+            server.sendThread(ref(qMsgSend));
         });
 
         poolThr.enqueue([&]{
-            server.timeoutThread(client,timeoutList);
+            server.timeoutThread(ref(client),ref(timeoutList));
         });
 
         while(1){

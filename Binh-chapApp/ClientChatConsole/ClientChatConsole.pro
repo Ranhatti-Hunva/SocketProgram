@@ -6,8 +6,11 @@ CONFIG -= qt
 SOURCES += \
         main.cpp \
     clientchat.cpp \
-    handlemsg.cpp
+    handlemsg.cpp \
+    md5.cpp
 
 HEADERS += \
     clientchat.h \
-    handlemsg.h
+    handlemsg.h \
+    md5.h \
+    threadpool.h

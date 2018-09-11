@@ -17,6 +17,12 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <map>
+#include <sys/types.h>
+#include <sys/event.h>
+#include <sys/time.h>
+#include "md5.h"
+#include "threadpool.h"
+#include <fstream>
 //---------------------------------------------------------------------------------------
 #define HOST "localhost"
 #define PORT "8096"
@@ -36,7 +42,6 @@ struct timeoutSend{
 };
 
 //------------thread receive msg from server---------------------------------------------
-
 void recvMsg(unsigned char *buf,int sockfd,std::vector<timeoutSend>&timeoutQ){
     long int timeRSP = 0;
     struct timeval tp;
@@ -53,7 +58,7 @@ void recvMsg(unsigned char *buf,int sockfd,std::vector<timeoutSend>&timeoutQ){
             struct msg_text msg_get;
             struct msg_text msg_rsp;
             HandleMsg handleMsg;
-            //std::cout<<"bytes recv "<<bytesRecv<<"\n";
+            std::cout<<"bytes recv "<<bytesRecv<<"\n";
             std::vector<unsigned char> buffer;
             buffer.insert(buffer.end(),&buf[0],&buf[bytesRecv]);
 
@@ -66,10 +71,10 @@ void recvMsg(unsigned char *buf,int sockfd,std::vector<timeoutSend>&timeoutQ){
             while(buffer.size()>0){
                 bool is_success = handleMsg.unpacked_msg(msg_get,buffer);
                 if(!is_success && (buffer.size() > 0)){
-//                    printf("vao \n");
-                    for(int i = 0; i < buffer.size();i++){
-                        printf(" %d ",buffer[i]);
-                    }
+                    //                    printf("vao \n");
+                    //                    for(int i = 0; i < buffer.size();i++){
+                    //                        printf(" %d ",buffer[i]);
+                    //                    }
                     break;
                 }
                 else{
@@ -144,12 +149,39 @@ void recvMsg(unsigned char *buf,int sockfd,std::vector<timeoutSend>&timeoutQ){
 
 
 }
+//------------Read All Bytes in file ----------------------------------------------------
+char * ReadAllBytes(const char * filename, int * read)
+{
+    std::ifstream ifs(filename, std::ios::binary|std::ios::ate);
+    std::ifstream::pos_type pos = ifs.tellg();
+
+    // What happens if the OS supports really big files.
+    // It may be larger than 32 bits?
+    // This will silently truncate the value/
+    int length = pos;
+
+    // Manuall memory management.
+    // Not a good idea use a container/.
+    char *pChars = new char[pos];
+    ifs.seekg(0, std::ios::beg);
+    ifs.read(pChars, length);
+
+    // No need to manually close.
+    // When the stream goes out of scope it will close the file
+    // automatically. Unless you are checking the close for errors
+    // let the destructor do it.
+    ifs.close();
+    *read = length;
+    return pChars;
+}
+
 //------------struct file node-----------------------------------------------------------
 struct fileNode{
-    int id;
+    //int id;
     std::string filePath;
-    bool isSend;
-    time_t timeModify;
+    //bool isSend;
+    //time_t timeModify;
+    std::string hashVa;
 };
 
 //------------get file name--------------------------------------------------------------
@@ -163,14 +195,22 @@ int getdir (std::string dir, std::vector<std::string> &files)
     }
 
     while ((dirp = readdir(dp)) != nullptr) {
-        files.push_back(std::string(dirp->d_name));
+
+        std::size_t found = std::string(dirp->d_name).find_last_of(".");
+        std::string txtExtension = std::string(dirp->d_name)
+                .substr(found+1,dirp->d_namlen);
+
+        if(strcmp(txtExtension.c_str(),"txt") == 0){
+            files.push_back(std::string(dirp->d_name));
+
+        }
     }
     closedir(dp);
     return 0;
 }
 
 //------------add file to Q send---------------------------------------------------------
-void addFileList(std::vector<fileNode>&fileList,std::string fileName){
+/*void addFileList(std::vector<fileNode>&fileList,std::string fileName){
     std::map<std::string,int> mapFile;
     std::map<std::string,int>::iterator it;
 
@@ -202,10 +242,152 @@ void addFileList(std::vector<fileNode>&fileList,std::string fileName){
     }
 
 }
+*/
+//----send msg in file ------------------------------------------------------------------
+void sendMsgInFile(std::string name,
+                   std::string filePath,
+                   std::queue<msg_text>&msgQ){
+
+    std::ifstream ifs(filePath, std::ios::binary|std::ios::ate);
+    std::ifstream::pos_type pos = ifs.tellg();
+    ifs.seekg(0, std::ios::beg);
+    int block = 1024; // 1 KB
+
+    int numberBlock = (pos/block) + 1;
+    std::cout<<"pos number  "<<pos<<"\n";
+    std::cout<<"block number  "<<numberBlock<<"\n";
+    for(int i = 0; i < numberBlock; i++){
+        char *pChars = new char[block];
+        memset(pChars,0,block);
+
+        ifs.read(pChars,block);
+        std::cout<<"block   "<< i << "-----------------\n"<<std::string(pChars,0,1024)<<"\n";
+        msg_text msgSend;
+        msgSend.type_msg = MSG;
+        msgSend.msg.assign(name + "/" +pChars);
+        mtx.lock();
+        msgQ.push(msgSend);
+        usleep(1000);
+        mtx.unlock();
+        delete []pChars;
+    }
+    ifs.close();
+
+
+}
+//----compare hash  ----------------------------------------------------------------
+//return true if hash value equal
+
+bool compareHashvalue(std::vector<fileNode>&fileList,std::string fileName){
+    int len;
+    char * str = ReadAllBytes(fileName.c_str(),&len);
+    for(uint i = 0; i < fileList.size() ; i++){
+        if(strcmp(fileList[i].filePath.c_str(),fileName.c_str()) == 0){
+
+            if(strcmp(fileList[i].hashVa.c_str(),md5(str).c_str()) == 0){
+                return true;
+            }
+            fileList[i].hashVa.clear();
+            fileList[i].hashVa.assign(md5(str));
+            return false;
+        }
+    }
+
+    fileNode node;
+    node.hashVa.assign(md5(str));
+    node.filePath.assign(fileName);
+
+    fileList.push_back(node);
+
+    return false;
+}
+
+//----thread send file ------------------------------------------------------------------
+
+void sendFileThread(std::string name,
+                    std::queue<msg_text>&msgQ,
+                    bool &stopFile){
+
+    //lay list file name
+    //ghep vs ten username r send
+    //kiem tra thay doi
+    //tiep tuc gui
+    const char * folderPath = "../readFile";
+    std::string dir;
+    dir.assign(folderPath);
+    std::vector<std::string> files = std::vector<std::string>();
+    getdir(dir,files);
+    std::vector<fileNode>fileList;
+    fileList.clear();
+
+    std::cout<<"co vao 1 "<<name<<"\n";
+
+    for (uint i = 0; i < files.size(); i++) {
+        std::cout<<"co vao 2 "<<files[i]<<"\n";
+        std::string fullName;
+        fullName.assign("../readFile/"+files[i]);
+        std::cout<<fullName<<" lon\n";
+
+        int len;
+        char * plaintext = ReadAllBytes(fullName.c_str(),&len);
+
+        fileNode node;
+        node.hashVa = md5(plaintext);
+        node.filePath.assign(fullName);
+
+        fileList.push_back(node);
+        //gui moi
+        sendMsgInFile(name,fullName,ref(msgQ));
+    }
+
+    int kQ = kqueue();
+    int dirFd = open(folderPath,O_RDONLY);
+    std::cout<<" dir fd "<<dirFd<<"\n";
+    struct kevent dirEvent;
+    EV_SET(&dirEvent,dirFd, EVFILT_VNODE,EV_ADD|EV_CLEAR|EV_ENABLE,NOTE_WRITE,0,(void *)folderPath);
+
+    kevent(kQ, &dirEvent, 1, nullptr, 0, nullptr);
+
+    struct timespec time_delay;
+    time_delay.tv_sec = 1;
+    time_delay.tv_nsec = 0;
+
+    while(!stopFile){
+
+        struct kevent change;
+        memset(&change,0,sizeof(change));
+        if(kevent(kQ,nullptr,0,&change, 1, &time_delay) == -1){
+            stopFile = true;
+            break;
+        }
+        else if(change.udata != nullptr){
+
+            std::cout<<"co vao day\n";
+            std::vector <std::string> fileChange;
+
+            getdir(dir,fileChange);
+
+            for(uint i = 0; i <fileChange.size();i++){
+                std::string fullName;
+                fullName.assign("../readFile/"+fileChange[i]);
+                if(compareHashvalue(fileList,fullName) == false){
+                    // gui moi
+                    sendMsgInFile(name,fullName,ref(msgQ));
+                }
+            }
+
+
+        }
+    }
+
+}
+
 
 //----thread nhan tu console-------------------------------------------------------------
 
-void cinFromConsole(int socket,std::queue<msg_text>&msgQ,std::vector<fileNode>&fileList){
+void cinFromConsole(int socket,
+                    std::queue<msg_text>&msgQ,
+                    thread_pool &pool){
     //int socket;std::queue<msg_text>msgQ;
 
     std::string folderPath = "../readFile";
@@ -214,19 +396,20 @@ void cinFromConsole(int socket,std::queue<msg_text>&msgQ,std::vector<fileNode>&f
     tv.tv_sec = 0;
     tv.tv_usec = 500000;
 
+    bool stopFile = false;
 
     //std::to_string(42);
     //test 1000 msg/s
-//    sleep(15);
-//    for(int i = 0;i <1000; i++){
-//        msgSend.type_msg = MSG;
-//        msgSend.msg.assign("all/hello "+std::to_string(i));
-//        mtx.lock();
-//        msgQ.push(msgSend);
-//        usleep(1000);//1ms
-//        mtx.unlock();
+    //    sleep(15);
+    //    for(int i = 0;i <1000; i++){
+    //        msgSend.type_msg = MSG;
+    //        msgSend.msg.assign("all/hello "+std::to_string(i));
+    //        mtx.lock();
+    //        msgQ.push(msgSend);
+    //        usleep(1000);//1ms
+    //        mtx.unlock();
 
-//    }
+    //    }
 
     while(stop!=1){
         fd_set read;
@@ -247,7 +430,18 @@ void cinFromConsole(int socket,std::queue<msg_text>&msgQ,std::vector<fileNode>&f
                 break;
             }
             else if(strcmp(userInput.substr(0,4).c_str(),"file") == 0){
-                std::string dir;
+                stopFile = false;
+                std::string username = userInput.substr(5,userInput.size());
+
+                if(!username.empty()){
+                    //add thread
+                    std::cout<<"usr name "<<username<<"\n";
+                    pool.enqueue([&,username]{
+                        sendFileThread(username,ref(msgQ),stopFile);
+                    });
+                }
+
+                /*               std::string dir;
                 dir.assign(folderPath);
                 std::vector<std::string> files = std::vector<std::string>();
                 getdir(dir,files);
@@ -290,7 +484,7 @@ void cinFromConsole(int socket,std::queue<msg_text>&msgQ,std::vector<fileNode>&f
                             msgSend.type_msg = MSG;
                             msgSend.msg.assign(username + "/" +pChars);
                             mtx.lock();
-                            //usleep(10000);
+
                             msgQ.push(msgSend);
                             mtx.unlock();
                             delete []pChars;
@@ -300,9 +494,12 @@ void cinFromConsole(int socket,std::queue<msg_text>&msgQ,std::vector<fileNode>&f
                         fileList[i].isSend = true;
                     }
                 }
+*/
 
 
-
+            }
+            else if(strcmp(userInput.c_str(),"un_file/...") == 0){
+                stopFile = true;
             }
             else if(userInput.size() >0){
 
@@ -326,18 +523,19 @@ void sendMsg(int socket,std::queue<msg_text>&msgQ,std::vector<timeoutSend>&timeo
     struct timeval tp;
     while(stop!=1){
         if(!msgQ.empty()){
-            int buferSize = msgQ.front().msg.length()+9;
+            int buferSize = msgQ.front().msg.length()+10;
 
             unsigned char *buf = new unsigned char [buferSize];
+            memset(buf,0,buferSize);
             //std::unique_ptr <unsigned char> buf (new unsigned char [buferSize]);
             handleMsg.packed_msg(msgQ.front(),buf);
 
-            //            std::cout<<"send buf\n";
-            //            for(int i = 0; i< buferSize;i++){
-            //                std::cout<<(unsigned int)buf.get()[i]<<" ";
-            //            }
-            //            std::cout<<"\n";
+            std::cout<<"\nlbi  --- "<<buferSize<<" "<< msgQ.size()<<"\n";
+            for(int i = 0; i < buferSize;i++){
 
+                printf("%c",msgQ.front().msg.c_str()[i]);
+            }
+            std::cout<<"\n";
             if(send(socket,buf,buferSize,0) > 0){
                 mtx.lock();
                 timeoutSend node;
@@ -487,17 +685,13 @@ int main()
     char statusBuf[10]; // buf status login
     std::string userInput;
     std::vector <timeoutSend> timeoutList;
+    thread_pool pool(10);
 
-    std::vector<fileNode>fileLst(MAX_FILE_TXT);
 
     std:: queue <msg_text> qSend;
     bool reconnect = true;
-    //init file list
-    for(int i = 0; i < MAX_FILE_TXT; i++){
-        fileLst[i].id = -1;
-        fileLst[i].isSend = false;
-        fileLst[i].timeModify = 0;
-    }
+
+
 
     while(reconnect){
         stop = 0;
@@ -541,7 +735,11 @@ int main()
             fcntl(socket, F_SETFL, O_NONBLOCK);
             // main thread for send msg
             // press # for logout
-            std::thread cinConsoleThread(cinFromConsole,socket,ref(qSend),ref(fileLst));
+            //std::thread cinConsoleThread(cinFromConsole,socket,ref(qSend),ref(pool));
+
+            pool.enqueue([&]{
+                cinFromConsole(socket,ref(qSend),pool);
+            });
             std::thread sendMsgThread(sendMsg,socket,ref(qSend),ref(timeoutList));
             std::thread recvThread(recvMsg,bufrcv,socket,ref(timeoutList));
             std::thread timeoutThr(timeoutThread,socket,ref(timeoutList),ref(qSend));
@@ -551,7 +749,7 @@ int main()
             //stop all thread before reconnect
             sendMsgThread.join();
             recvThread.join();
-            cinConsoleThread.join();
+            //cinConsoleThread.join();
             timeoutThr.join();
         }
 
