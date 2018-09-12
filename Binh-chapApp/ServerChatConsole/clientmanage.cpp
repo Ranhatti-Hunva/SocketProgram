@@ -179,7 +179,7 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
     if(found != std::string::npos){
         char nameClient[found];
         strcpy(nameClient,strMsg.substr(0,found).c_str());
-        std::string a = strMsg.substr(0,found);
+        //std::string a = strMsg.substr(0,found);
 
         std::cout<<"\nTen nguoi muon gui "<<std::string(nameClient,0,found)<<"\n";
 
