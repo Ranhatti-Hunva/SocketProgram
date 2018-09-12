@@ -70,27 +70,29 @@ bool ServerChat::listenSocket(int sock, int backLog){
 }
 //---------------------------------------------------------------------------------------
 
-void ServerChat::sendThread(std:: queue <sendNode> &qMsgSend,msgQueue &qSend){
+void ServerChat::sendThread( msgQueue &qSend, std::mutex &mt){
     timeval tv;
     tv.tv_sec = 0;
     tv.tv_usec = 5000;
     while(1){
+        mt.lock();
         if(!qSend.isEmpty()){
 
+            usleep(10000);
             fd_set sendFds;
             FD_ZERO(&sendFds);
             FD_SET(qSend.frontQ().socket,&sendFds);
 
-            if (select(qSend.frontQ().socket+1,nullptr, &sendFds, nullptr, &tv) <0){
+            if (select(qSend.frontQ().socket+1,nullptr, &sendFds, nullptr, nullptr) <0){
                 perror("Error with select on this socket");
             }
 
             if(FD_ISSET(qSend.frontQ().socket, &sendFds)){
-                std::cout<<"\nlbi  --- "<<qSend.frontQ().len<<"\n";
-                for(int i = 0; i < qSend.frontQ().len;i++){
+                //                std::cout<<"\nlbi  --- "<<qSend.frontQ().len<<"\n";
+                //                for(int i = 0; i < qSend.frontQ().len;i++){
 
-                    printf("%c",qSend.frontQ().buf[i]);
-                }
+                //                    printf("%d",qSend.frontQ().buf[i]);
+                //                }
                 long int numSend = send(qSend.frontQ().socket,
                                         qSend.frontQ().buf,
                                         qSend.frontQ().len,0);
@@ -98,11 +100,10 @@ void ServerChat::sendThread(std:: queue <sendNode> &qMsgSend,msgQueue &qSend){
                     perror("send :");
                 }
                 qSend.popQ();
-                //qMsgSend.pop();
+
             }
-
-
         }
+        mt.unlock();
     }
 }
 
@@ -110,7 +111,7 @@ void ServerChat::sendThread(std:: queue <sendNode> &qMsgSend,msgQueue &qSend){
 void ServerChat::clientQRecv(struct msg_text msgHandle,
                              std::vector <clientNode> &clientList,
                              std::vector <timeoutNode> &timeoutList,
-                             std:: queue <sendNode> &qMsgSend,msgQueue &qSend){
+                             msgQueue &qSend, std::mutex &mt){
     ClientManage cliManage;
     //std::unique_ptr<char> msgbuf(new char[2048]);
     char *msgbuf = new char[msgHandle.msg.size()];
@@ -118,21 +119,21 @@ void ServerChat::clientQRecv(struct msg_text msgHandle,
     strcpy(msgbuf,msgHandle.msg.c_str());
     //std::cout<<"msg :"<<msgHandle.msg<<"\n";
 
-//    std::cout<<"\n\nlbc  --- "<<" "<< msgHandle.msg.size()<<"\n";
-//    for(int i = 0; i < msgHandle.msg.size();i++){
+    //    std::cout<<"\n\nlbc  --- "<<" "<< msgHandle.msg.size()<<"\n";
+    //    for(int i = 0; i < msgHandle.msg.size();i++){
 
-//        printf("%c",msgHandle.msg.c_str()[i]);
-//    }
-//    std::cout<<"\n\n";
+    //        printf("%c",msgHandle.msg.c_str()[i]);
+    //    }
+    //    std::cout<<"\n\n";
 
     switch(msgHandle.type_msg){
     case SGI:
-        skExist = cliManage.mapClientWithSocket(clientList,msgHandle.socketfd,msgbuf,read_fds,qMsgSend,qSend);
+        mtx.lock();
+        skExist = cliManage.mapClientWithSocket(clientList,msgHandle.socketfd,msgbuf,read_fds,mt);
         if(skExist != -1){
-            mtx.lock();
             FD_CLR(skExist,&read_fds);
-            mtx.unlock();
         }
+        mtx.unlock();
         for(int i = 0 ; i < MAX_CLIENT ; i++){
             if(clientList[i].status == true){
                 std::cout<<"Name client online "<< std::string(clientList[i].name,0,20) <<" socket "<< clientList[i].socketfd<<"\n";
@@ -141,12 +142,14 @@ void ServerChat::clientQRecv(struct msg_text msgHandle,
                 std::cout<<"Name client offline "<< std::string(clientList[i].name,0,20) <<"\n";
             }
         }
+        cliManage.sendOffClient(qSend,mt,clientList);
+
         break;
 
     case MSG:
         //push msg will send (msg, socket)
         mtx.lock();
-        cliManage.sendMsgToClient(clientList,msgbuf,msgHandle.socketfd,timeoutList,ref(qMsgSend),qSend);
+        cliManage.sendMsgToClient(clientList,msgbuf,msgHandle.socketfd,timeoutList,qSend,mt);
         mtx.unlock();
         break;
     case RSP:
@@ -212,17 +215,16 @@ void clientQSend(struct msg_text msgHandle){
 }
 //---------------------------------------------------------------------------------------
 
-void ServerChat::recvData(int serverFd,
-                          std:: queue <sendNode> &qMsgSend,
+void ServerChat::recvData(int serverFd,                          
                           std::vector<clientNode> &clientLst,
                           thread_pool &poolThread,
                           std::vector<timeoutNode> &timeoutList,
-                          msgQueue &qSend){
+                          msgQueue &qSend,std::mutex &mt){
     //    FD_ZERO(&listener);
     //    //FD_ZERO(&read_fds);
     //    FD_SET(serverFd, &listener);
     //fdmax = serverFd;
-
+    //std::mutex mta;
     //read_fds = listener;
     fd_set listener = this->read_fds;
     struct timeval tv;
@@ -293,7 +295,7 @@ void ServerChat::recvData(int serverFd,
 
 
                 if ((nbytes == -1) && ((errno == EAGAIN)|| (errno == EWOULDBLOCK))){
-                    perror("=> Message is not gotten complete !!");
+                    //perror("=> Message is not gotten complete !!");
                 }
                 if(nbytes == 0){
                     // close connect
@@ -327,12 +329,6 @@ void ServerChat::recvData(int serverFd,
                     }
                     else{
 
-//                        std::cout<<"\n\nlba  --- "<<" "<< recvMsg.msg.size()<<"\n";
-//                        for(int i = 0; i < recvMsg.msg.size();i++){
-
-//                            printf("%c",recvMsg.msg.c_str()[i]);
-//                        }
-                        std::cout<<"\n\n";
                         //enQ thread pool
                         if(recvMsg.type_msg != RSP){
 
@@ -344,8 +340,8 @@ void ServerChat::recvData(int serverFd,
                             });
                         }
 
-                        poolThread.enqueue([=,&clientLst,&timeoutList,&qMsgSend,&qSend]{
-                            clientQRecv(recvMsg,clientLst,timeoutList,qMsgSend,qSend);
+                        poolThread.enqueue([=,&clientLst,&timeoutList,&qSend,&mt]{
+                            clientQRecv(recvMsg,clientLst,timeoutList,qSend,mt);
                         });
 
                     }

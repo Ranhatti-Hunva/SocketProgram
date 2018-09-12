@@ -59,17 +59,14 @@ public:
     void clientQRecv(struct msg_text msgHandle,
                      std::vector<clientNode> &clientList,
                      std::vector<timeoutNode> &timeoutList,
-                     std:: queue <sendNode> &qMsgSend,
-                     msgQueue &qSend);
+                     msgQueue &qSend, std::mutex &mt);
     //std::vector<clientNode> client();
     void timeoutThread(std::vector <clientNode> &clientList, std::vector <timeoutNode> &timeoutList);
     void recvData(int serverFd,
-                  std::queue<sendNode> &qMsgSend,
                   std::vector<clientNode> &clientLst,
                   thread_pool &poolThread, std::vector<timeoutNode> &timeoutList,
-                  msgQueue &qSend);
-    void sendThread(std:: queue <sendNode> &qMsgSend,
-                    msgQueue &qSend);
+                  msgQueue &qSend, std::mutex &mt);
+    void sendThread(msgQueue &qSend, std:: mutex &mt);
 
 private:
 

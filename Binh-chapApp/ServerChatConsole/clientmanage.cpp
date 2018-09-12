@@ -12,13 +12,11 @@ ClientManage::ClientManage()
 //------login client---------------------------------------------------------------------
 int ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,
                                       int socketfd, char * buf, fd_set &fds,
-                                      std::queue<sendNode> &qMsgSend,
-                                      msgQueue &qSend
-                                      ){
+                                      std::mutex &mt){
     bool flagCheck = false;
     HandleMsg handle;
     int socketExist = -1;
-
+    mt.lock();
     std::map<std::string,int> mapClient;
     std::map<std::string,int>::iterator it;
 
@@ -30,14 +28,10 @@ int ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,
 
     it = mapClient.find(buf);
     if (it != mapClient.end()){
-        //mapClient.
-        //        it->first;
-        //        std::cout<<"has name in list \n";
         //client da ton tai
         int posClient = it->second;
         if(clientList[posClient].status == false){
             flagCheck = true;
-            //send(socketfd,"success",7,0);
 
             //check socket co mo hay ko truong hop timeout
             if(FD_ISSET(clientList[posClient].socketfd,&fds) == 0){
@@ -50,14 +44,57 @@ int ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,
                     socketExist = clientList[posClient].socketfd;
                 }
             }
-
-
             clientList[posClient].status = true;
             clientList[posClient].socketfd = socketfd;
-            //usleep(1000);
+            //readfile client offline
+            clientList[posClient].readfile = true;
+        }
+        else{
+            //client online in another console -> close one
+            flagCheck = true;
+            clientList[posClient].readfile = false;
+            socketExist = clientList[posClient].socketfd;
+            clientList[posClient].socketfd = socketfd;
+        }
+
+    }
+    else{
+        //add new client
+        int posClient = mapClient.size();
+        clientList[posClient].id =  posClient;
+        clientList[posClient].name = new char[strlen(buf)+1];
+        strcpy(clientList[posClient].name,buf);
+        clientList[posClient].socketfd = socketfd;
+        clientList[posClient].status = true;
+        std::cout<<"Client connect info: ";
+        std::cout<<"Name " << std::string(clientList[posClient].name,
+                                          0,strlen(clientList[posClient].name))<<" - ";
+        std::cout<<"socket "<<socketfd<<"\n";
+        clientList[posClient].readfile = false;
+        flagCheck = true;
+    }
+    if(flagCheck == false){
+        //send(socketfd,"full",5,0);
+        std::cout<<"socket full "<<socketfd<<"\n";
+        std::cout<<"server is full client\n";
+    }
+
+    mt.unlock();
+    return socketExist;
+
+}
+//------ send msg in file for client offline---------------------------------------------
+void ClientManage::sendOffClient(msgQueue &qSend,
+                                 std::mutex &mt,
+                                 std::vector <clientNode> &clientList){
+    for(int i = 0; i< clientList.size() ; i++){
+        mt.lock();
+
+        if(clientList[i].readfile == true){
+            //std::cout<<"name "<<std::string(clientList[i].name,0,20)<<" co vao day\n" ;
             std::ifstream infile;
-            char * filename = new char[strlen(clientList[posClient].name)];
-            strcpy(filename,clientList[posClient].name);
+            char * filename = new char[strlen(clientList[i].name)];
+            strcpy(filename,clientList[i].name);
 
             infile.open(strcat(filename,".txt"));
 
@@ -77,50 +114,27 @@ int ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,
                         handleMsg.packed_msg(msgSend,buffer);
 
 
-//                        struct timeval tv;
-//                        tv.tv_sec = 0;
-//                        tv.tv_usec = 5000;
-//                        fd_set sendFds;
-//                        FD_ZERO(&sendFds);
-//                        FD_SET(clientList[posClient].socketfd,&sendFds);
-
-//                        if (select(clientList[posClient].socketfd+1,nullptr, &sendFds, nullptr, nullptr) <0){
-//                            perror("Error with select on this socket");
-//                        }
-
-//                        if(FD_ISSET(clientList[posClient].socketfd, &sendFds)){
-//                            int numSend = send(clientList[posClient].socketfd,buffer,sizeof(buffer),0);
-//                            if(numSend < 0){
-//                                perror("send :");
-//                            }
-
-//                        }
-
-                        send(clientList[posClient].socketfd,buffer,sizeof(buffer),0);
-
-
                         sendNode node;
-                        node.buf = buffer;
                         node.len = sizeof(buffer);
-                        node.socket = clientList[posClient].socketfd;
+
+                        node.buf = new uint8_t [node.len];
+                        memcpy(node.buf,buffer,node.len);
+
+                        node.socket = clientList[i].socketfd;
                         node.msgID = msgSend.ID;
                         qSend.pushQ(node);
-//                        qMsgSend.push(node);
+                        //                        std::cout<<"\nnode buf send 1 \n";
+                        //                        for(int i = 0; i < node.len; i++){
+                        //                            std::cout<<(int)node.buf[i] <<" ";
+                        //                        }
+                        //                        std::cout<<"\n";
+                        //                        usleep(100000);
+                        //                        std::cout<<"\nnode buf send 2 \n";
+                        //                        for(int i = 0; i < node.len; i++){
+                        //                            std::cout<<(int)node.buf[i] <<" ";
+                        //                        }
+                        //                        std::cout<<"\n";
 
-//                        std::cout<<"\nbeffor send\n";
-//                        for(int i = 0; i < node.len; i++){
-//                             std::cout<<(int)buffer[i]<<" ";
-//                        }
-//                        std::cout<<"\n";
-
-//                        std::cout<<"\nnode buf send\n";
-//                        for(int i = 0; i < node.len; i++){
-//                             std::cout<<(int)node.buf[i]<<" ";
-//                        }
-//                        std::cout<<"\n";
-
-//                        std::cout<<"len "<<node.len<<"\n";
-                        std::cout<<line<<"\n";
                     }
 
                 }
@@ -128,48 +142,22 @@ int ClientManage::mapClientWithSocket(std::vector <clientNode> &clientList,
                 std::ofstream ofs;
                 ofs.open(filename, std::ofstream::out | std::ofstream::trunc);
                 ofs.close();
+
             }
+            clientList[i].readfile = false;
         }
-        else{
-            flagCheck = true;
-            //mtx.lock();
-            //close(clientList[posClient].socketfd);
-            //mtx.unlock();
-            socketExist = clientList[posClient].socketfd;
-            clientList[posClient].socketfd = socketfd;
-        }
-
+        mt.unlock();
     }
-    else{
-        //add new client
-        int posClient = mapClient.size();
-        clientList[posClient].id =  posClient;
-        clientList[posClient].name = new char[strlen(buf)+1];
-        strcpy(clientList[posClient].name,buf);
-        clientList[posClient].socketfd = socketfd;
-        clientList[posClient].status = true;
-        std::cout<<"Client connect info: ";
-        std::cout<<"Name " << std::string(clientList[posClient].name,
-                                          0,strlen(clientList[posClient].name))<<" - ";
-        std::cout<<"socket "<<socketfd<<"\n";
-        flagCheck = true;
-    }
-    if(flagCheck == false){
-        //send(socketfd,"full",5,0);
-        std::cout<<"socket full "<<socketfd<<"\n";
-        std::cout<<"server is full client\n";
-    }
-    return socketExist;
-
 }
+
 
 //------------send Msg To client---------------------------------------------------------
 
 void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
                                    char *msg, int socketfd,
                                    std::vector <timeoutNode> &timeoutList,
-                                   std:: queue <sendNode> &qMsgSend,
-                                   msgQueue &qSend){
+
+                                   msgQueue &qSend,std::mutex &mt){
 
 
     struct timeval tv;
@@ -189,7 +177,7 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
 
     std::size_t found = strMsg.find_first_of("/");
     if(found != std::string::npos){
-       char nameClient[found];
+        char nameClient[found];
         strcpy(nameClient,strMsg.substr(0,found).c_str());
         std::string a = strMsg.substr(0,found);
 
@@ -227,7 +215,7 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
         }
 
         //dong goi data
-       struct msg_text msgSend;
+        struct msg_text msgSend;
         msgSend.type_msg = MSG;
 
         msgSend.msg.assign(std::string(bufSend,0,strlen(bufSend)));
@@ -243,45 +231,37 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
 
                     // dong goi truoc khi send
                     //send(clientList[i].socketfd ,buffer,sizeof(buffer),0);
-//                    std::lock_guard<std::mutex> q_send_locker(bfSend);
-//                    sendNode node;
-//                    node.buf = new unsigned char [sizeof(buffer)];
-//                    memset(node.buf,0,sizeof(buffer));
-//                    node.buf = buffer;
-//                    node.len = sizeof(buffer);
-//                    node.socket = clientList[i].socketfd;
-//                    node.msgID = msgSend.ID;
-                    send(clientList[i].socketfd,buffer,sizeof(buffer),0);
-                    //mt.lock();
-//                   qSend.pushQ(node);
+                    //                    std::lock_guard<std::mutex> q_send_locker(bfSend);
 
-//                    while(!qSend.isEmpty()){
-//                        std::cout<<"\n -----------------------------\n" <<std::endl;
-//                        for(int i = 0; i <qSend.frontQ().len;i++){
-//                            std::cout<<qSend.frontQ().buf[i];
-//                        }
-//                        std::cout<<std::endl;
-//                        qSend.popQ();
-//                    }
-                    //qMsgSend.push(node);
+                    mt.lock();
+                    sendNode node;
+                    uint len = sizeof(buffer);
+                    node.buf = new uint8_t [len];
+                    memcpy(node.buf,buffer,len);
+                    node.len = len;
+                    node.socket = clientList[i].socketfd;
+                    node.msgID = msgSend.ID;
 
+                    qSend.pushQ(node);
                     //mt.unlock();
-//                    std::cout<<"\nlolo  --- "<<qMsgSend.front().len<<"\n";
-//                    for(int i = 0; i < qMsgSend.front().len;i++){
+                    //send(clientList[i].socketfd,buffer,sizeof(buffer),0);
 
-//                        printf("%c",qMsgSend.front().buf[i]);
-//                    }
+                    //                    std::cout<<"\nlolo  --- "<<qMsgSend.front().len<<"\n";
+                    //                    for(int i = 0; i < qMsgSend.front().len;i++){
+
+                    //                        printf("%c",qMsgSend.front().buf[i]);
+                    //                    }
                     //std::cout<<"\nlolo \n" <<std::string(node.buf,0,2048)<<" lol ---- "<<qMsgSend.size()<<"\n";
                     //add Q timeout rsp
                     //mtx.lock();
-//                    gettimeofday(&tv, nullptr);
-//                    timeoutNode to;
-//                    to.timeout = tv.tv_sec*1000 + tv.tv_usec/1000 ;
-//                    to.msgID = msgSend.ID;
-//                    to.socket = clientList[i].socketfd;
-//                    timeoutList.push_back(to);
+                    gettimeofday(&tv, nullptr);
+                    timeoutNode to;
+                    to.timeout = tv.tv_sec*1000 + tv.tv_usec/1000 ;
+                    to.msgID = msgSend.ID;
+                    to.socket = clientList[i].socketfd;
+                    timeoutList.push_back(to);
                     //usleep(1000);
-                    //mtx.unlock();
+                    mt.unlock();
 
                 }
             }
@@ -295,27 +275,29 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
                     //dam bao rsp se gui truoc msg trong truong hop client gui msg cho chinh no
                     //usleep(1000);
                     //send(clientList[posClient].socketfd ,buffer,sizeof(buffer),0);
-//                    std::lock_guard<std::mutex> q_send_locker(bfSend);
-//                    sendNode node;
-//                    node.buf = new unsigned char [sizeof(buffer)];
-//                    memset(node.buf,0,sizeof(buffer));
-//                    node.buf = buffer;
-//                    node.len = sizeof(buffer);
-//                    node.socket = clientList[posClient].socketfd;
-//                    node.msgID = msgSend.ID;
-//                    qSend.pushQ(node);
-                    send(clientList[posClient].socketfd,buffer,sizeof(buffer),0);
+                    mt.lock();
+                    sendNode node;
+                    uint len = sizeof(buffer);
+                    node.buf = new uint8_t [len];
+                    memcpy(node.buf,buffer,len);
+                    node.len = len;
+                    node.socket = clientList[posClient].socketfd;
+                    node.msgID = msgSend.ID;
+
+                    qSend.pushQ(node);
+                    //mt.unlock();
+                    //send(clientList[posClient].socketfd,buffer,sizeof(buffer),0);
                     //qMsgSend.push(node);
 
                     //mtx.lock();
-//                    gettimeofday(&tv, nullptr);
-//                    timeoutNode to;
-//                    to.timeout = tv.tv_sec*1000 + tv.tv_usec/1000 ;
-//                    to.msgID = msgSend.ID;
-//                    to.socket = clientList[posClient].socketfd;
-//                    timeoutList.push_back(to);
+                    gettimeofday(&tv, nullptr);
+                    timeoutNode to;
+                    to.timeout = tv.tv_sec*1000 + tv.tv_usec/1000 ;
+                    to.msgID = msgSend.ID;
+                    to.socket = clientList[posClient].socketfd;
+                    timeoutList.push_back(to);
                     //usleep(100);
-                    //mtx.unlock();
+                    mt.unlock();
                 }
                 else{
                     std::ofstream outfile;

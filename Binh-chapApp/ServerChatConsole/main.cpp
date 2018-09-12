@@ -13,6 +13,7 @@ void initClientList(std::vector<clientNode> &clientLst){
         clientLst[i].status = false;
         clientLst[i].socketfd = -1;
         clientLst[i].id = -1;
+        clientLst[i].readfile = false;
     }
 }
 
@@ -26,7 +27,7 @@ int main()
     std::vector<clientNode> client(MAX_CLIENT);
     msgQueue qSend;
     ServerChat server(HOST,PORT);
-
+    std::mutex mtx;
     server.initSet();
     int socket = server.createSocket();
 
@@ -47,7 +48,7 @@ int main()
 
 
         poolThr.enqueue([&]{
-            server.sendThread(ref(qMsgSend),qSend);
+            server.sendThread(qSend,mtx);
         });
 
         poolThr.enqueue([&]{
@@ -55,7 +56,7 @@ int main()
         });
 
         while(1){
-            server.recvData(socket,ref(qMsgSend),ref(client),poolThr,ref(timeoutList),qSend);
+            server.recvData(socket,ref(client),poolThr,ref(timeoutList),qSend,mtx);
         }
 
         server.cleanUp();
