@@ -112,7 +112,6 @@ void load_cmd(const int client_oder, TCPclient& client_helper, msg_queue& msg_wt
         if(!user_cmd.empty())
         {
             string user_cmd_str = user_cmd.front();
-//            std::cout<< user_cmd_str << std::endl;
 
             if(user_cmd_str.compare("#"))
             {
@@ -152,6 +151,9 @@ void load_cmd(const int client_oder, TCPclient& client_helper, msg_queue& msg_wt
                             std::vector<unsigned char> element;
                             client_helper.packed_msg(msg_send, element);
                             msg_wts.push(element, Q_MSG);
+
+//                            // Analyzer ping-pong
+//                            ping_pong[client_oder] += 1;
                         };
                     }
                     else
@@ -187,7 +189,7 @@ void load_cmd(const int client_oder, TCPclient& client_helper, msg_queue& msg_wt
     usleep(1000);
 };
 
-// Confirm exit from  user
+// Confirm exit from user
 bool is_reconnect(int& client_fd)
 {
     // Ask user if they want to reconnect with server after lose connection.

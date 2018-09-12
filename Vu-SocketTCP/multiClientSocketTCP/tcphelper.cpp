@@ -1,9 +1,23 @@
 #include "tcphelper.h"
 #include "iosocket.h"
 
+//bool is_error[NUM_CLIENT];
+
 // TCPhelper contructor, menthod, .....
-//std::vector<TCPhelper::rps_timeout> TCPhelper::rps_timeout_list;
-//const int TCPhelper::timeout;
+// using to analyser user command.
+void splits_string_2(const std::string& subject, std::vector<std::string>& container)
+{
+    container.clear();
+    size_t len = subject.length()+ 1;
+    char* s = new char[ len ];
+    memset(s, 0, len*sizeof(char));
+    memcpy(s, subject.c_str(), (len - 1)*sizeof(char));
+    for (char *p = strtok(s, ">"); p != nullptr; p = strtok(nullptr, ">"))
+    {
+        container.push_back(p);
+    }
+    delete[] s;
+}
 
 void ultoc(unsigned int& ul, unsigned char* cu)
 {
@@ -269,7 +283,7 @@ void TCPclient::send_msg(msg_queue& msg_wts, const int client_oder, int socket_f
             {
                 msg_wts.pop(Q_RSP);
             }
-            else if ((MSG == type_msg_send) || (SGI == type_msg_send) )
+            else if (MSG == type_msg_send)
             {
                 msg_wts.pop(Q_MSG);
 
@@ -281,6 +295,11 @@ void TCPclient::send_msg(msg_queue& msg_wts, const int client_oder, int socket_f
                 timepoint.timeout = std::chrono::system_clock::now();
                 timepoint.socket = socket_fd;
                 rps_timeout_list.push_back(timepoint);
+
+                if(MSG == msg_unpacked.type_msg)
+                {
+                    ping_pong[client_oder] += 1;
+                }
             }
             else if (PIG == type_msg_send)
             {
@@ -424,7 +443,7 @@ int TCPclient::recv_msg(const int client_fd, msg_queue& msg_wts, thread_pool& th
                 if (num_data == 0)
                 {
                     // Server force close socket
-                    printf("=> Connection has been close\n");
+                    printf("=> Connection for client %s has been close.\n", user_name[client_oder].c_str());
                 }
                 else
                 {
@@ -486,7 +505,27 @@ void TCPclient::process_on_buffer_recv(const unsigned char buffer[], const long 
 
                 std::unique_lock<std::mutex> lock_buffer(log_mutext);
                 printf("Message %d for client %s from server: %s \n", static_cast<int>(msg_get.ID), user_name[client_oder].c_str(),msg_get.msg.c_str());
-//                std::cout << "Message "<< static_cast<int>(msg_get.ID)<<" from server :" << msg_get.msg <<std::endl;
+
+                // Analyzer ping-pong
+                if(ping_pong[client_oder] == 0)
+                {
+                    vector<string> container;
+                    splits_string_2(msg_get.msg, container);
+
+                    msg_text msg_ping_pong;
+                    msg_ping_pong.type_msg = MSG;
+                    msg_ping_pong.msg = container[0]+ "/" + msg_get.msg.substr(container[0].size()+1, msg_get.msg.size() - container[0].size()-1);
+
+                    std::vector<unsigned char> element_msg;
+                    this -> packed_msg(msg_ping_pong, element_msg);
+                    msg_wts.push(element_msg, MSG);
+                };
+
+                ping_pong[client_oder] -= 1;
+                if (ping_pong[client_oder]<0)
+                {
+                    ping_pong[client_oder] = 0;
+                };
             };
         };
     };

@@ -28,7 +28,7 @@
 #define PIG 2
 #define RSP 3
 
-extern bool is_error[25];
+//extern bool is_error[25];
 
 static std::mutex log_mutext;
 
@@ -66,14 +66,14 @@ public:
 };
 
 class TCPclient: public TCPhelper{
-public:
+    bool ping;
+    msg_text ping_msg;
+
     std::vector<unsigned char> buffer;
     std::mutex ping_mutex;
     std::condition_variable con_ping;
 
-    bool ping;
-    msg_text ping_msg;
-
+public:
     TCPclient():TCPhelper()
     {
         ping = false;

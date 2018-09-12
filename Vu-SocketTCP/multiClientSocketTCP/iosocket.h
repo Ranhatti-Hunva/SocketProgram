@@ -21,6 +21,8 @@
 extern std::string user_name[NUM_CLIENT];
 extern bool end_connection[NUM_CLIENT];
 extern bool reconnect[NUM_CLIENT];
+extern bool is_error[NUM_CLIENT];
+extern int ping_pong[NUM_CLIENT];
 
 static mutex user_cmd_mu;
 static queue<string> user_cmd;
