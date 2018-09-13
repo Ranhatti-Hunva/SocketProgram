@@ -10,6 +10,7 @@ struct clientNode{
     int socketfd;
     std:: queue <std::string> msg;
     int id;
+    bool readfile;
 };
 
 struct timeoutNode{

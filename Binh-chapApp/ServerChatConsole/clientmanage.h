@@ -35,12 +35,11 @@ public:
     int mapClientWithSocket(std::vector <clientNode> &clientList,
                             int socketfd,
                             char * buf,
-                            fd_set &fds,
-                            std:: queue <sendNode> &qMsgSend, msgQueue &qSend);
+                            fd_set &fds, std::mutex &mt);
     void sendMsgToClient(std::vector <clientNode> &clientList,
                          char *msg, int socketfd,
-                         std::vector<timeoutNode> &timeoutList,
-                         std::queue<sendNode> &qMsgSend,msgQueue &qSend);
+                         std::vector<timeoutNode> &timeoutList, msgQueue &qSend, std::mutex &mt);
+    void sendOffClient(msgQueue &qSend,std::mutex &mt,std::vector <clientNode> &clientList);
 private:
     //std::mutex mtx;
 };
