@@ -37,10 +37,11 @@ int main()
 
     for(int i=0; i< NUM_CLIENT; i++)
     {
-        user_name[i] = "" + std::to_string(i);
+        user_name[i] = "C" + std::to_string(i);
         end_connection[i] = false;
         is_error[i] = false;
         reconnect[i] = true;
+        ping_pong[i] = 0;
     }
 
     // Read terminal.
@@ -60,20 +61,21 @@ int main()
 
                     /*------------------------------------------------------------------------------------------------------------*/
                     struct addrinfo *server_infor, *p;
-                    // server_infor = client_helper.get_addinfo_list("10.42.0.187",1500);
-                    // server_infor = client_helper.get_addinfo_list("10.42.0.126",8096);
-                    server_infor = client_helper.get_addinfo_list("",1500);
+                     server_infor = client_helper.get_addinfo_list("10.42.0.187",1500);
+//                     server_infor = client_helper.get_addinfo_list("10.42.0.127",8096);
+//                    server_infor = client_helper.get_addinfo_list("",1500);
                     p = server_infor;
 
                     /*------------------------------------------------------------------------------------------------------------*/
                     end_connection[client_oder] = false;
                     is_error[client_oder] = false;
+                    ping_pong[client_oder] = 0;
+
+                    // Thread pool
+                    thread_pool threads(5);
 
                     while (!end_connection[client_oder])
                     {
-                        // Thread pool
-                        thread_pool threads(7);
-
                         // Queue for the massages are wating to send.
                         msg_queue msg_wts;
                         msg_wts.clear(Q_MSG);
@@ -108,18 +110,22 @@ int main()
                                 break;
                             }
                         };
-                        if(end_connection[client_oder]) break;
-
+                        if(end_connection[client_oder]) break;                        
                         /*------------------------------------------------------------------------------------------------------------*/
                         // Connection success and start to communication.
                         threads.enqueue([&]()
                         {
                             client_helper.send_msg(msg_wts, client_oder, client_fd);
-                        });
+                        });                        
 
                         threads.enqueue([&]()
                         {
                             client_helper.timeout_clocker(client_oder);
+                        });
+
+                        threads.enqueue([&]()
+                        {
+                            client_helper.get_msg_buffer(client_oder, msg_wts, threads);
                         });
 
                         // Listern incomming message
@@ -152,11 +158,11 @@ int main()
                     freeaddrinfo(server_infor);
                 });
                 reconnect[client_oder] = false;
-                usleep(20000);
+                std::this_thread::sleep_for(std::chrono::milliseconds(20));
             }
             else
             {
-                usleep(1000);
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
             };
         };
 

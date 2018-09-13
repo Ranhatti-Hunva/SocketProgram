@@ -69,7 +69,10 @@ class TCPclient: public TCPhelper{
     bool ping;
     msg_text ping_msg;
 
+    queue<std::vector<unsigned char>> q_buffer;
     std::vector<unsigned char> buffer;
+    std::mutex buffer_mutex;
+
     std::mutex ping_mutex;
     std::condition_variable con_ping;
 
@@ -81,18 +84,17 @@ public:
         ping_msg.type_msg = PIG;
     }
 
-    std::mutex buffer_mutex;
-
     // Creat new socket and connect to a server with timeout. Let decision to re-connect on user.
     int connect_with_timeout(struct addrinfo *server_infor);
 
     // Recive and unpaccked message.
     int recv_msg(const int socket_fd, msg_queue& msg_wts, thread_pool& thread, const int client_oder);
+    void get_msg_buffer(const int client_oder, msg_queue& msg_wts, thread_pool& threads);
 
     // Send packed message.
     void send_msg(msg_queue& msg_wts, const int client_oder, int socket_fd);
 
-    void process_on_buffer_recv(const unsigned char buffer[], const long num_data, msg_queue& msg_wts, const int client_oder);
+    void process_on_buffer_recv(const msg_text msg_get, msg_queue& msg_wts, const int client_oder);
 
     void timeout_clocker(const int client_oder);
 };

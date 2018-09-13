@@ -137,7 +137,7 @@ bool TCPhelper::packed_msg(msg_text& msg_input, std::vector<unsigned char>& elem
         }
         else
         {
-            memcpy(ID_byte, &msg_input.ID, 4);            
+            memcpy(ID_byte, &msg_input.ID, 4);
         }
     };
 
@@ -203,7 +203,7 @@ void TCPclient::send_msg(msg_queue& msg_wts, const int client_oder, int socket_f
             {
                 type_msg_send = MSG;
                 element = msg_wts.get(Q_MSG);
-            };            
+            };
         }
         else
         {
@@ -296,10 +296,7 @@ void TCPclient::send_msg(msg_queue& msg_wts, const int client_oder, int socket_f
                 timepoint.socket = socket_fd;
                 rps_timeout_list.push_back(timepoint);
 
-                if(MSG == msg_unpacked.type_msg)
-                {
-                    ping_pong[client_oder] += 1;
-                }
+//                printf("=> Send msg %d : %s \n", msg_unpacked.ID, msg_unpacked.msg.c_str());
             }
             else if (PIG == type_msg_send)
             {
@@ -327,6 +324,7 @@ void TCPhelper::msg_confirm(const msg_text rsp)
     {
         if(rps_timeout_list[i].msg.ID == rsp.ID)
         {
+            // printf("=> Get rsp for msg %d \n", rsp.ID);
             rps_timeout_list.erase(rps_timeout_list.begin()+static_cast<long>(i));
             break;
         };
@@ -426,7 +424,7 @@ int TCPclient::recv_msg(const int client_fd, msg_queue& msg_wts, thread_pool& th
 
     if (FD_ISSET(client_fd, &read_fds))
     {
-        const unsigned int bufsize = 20;
+        const unsigned int bufsize = 1024;
         unsigned char recv_buf[bufsize] = {0};
         long num_data;
 
@@ -455,10 +453,11 @@ int TCPclient::recv_msg(const int client_fd, msg_queue& msg_wts, thread_pool& th
         }
         else
         {
-            threads.enqueue([=, &msg_wts]()
-            {
-                this->process_on_buffer_recv(recv_buf, num_data, msg_wts, client_oder);
-            });
+//            printf("=> Byte get for client %s: %d \n",user_name[client_oder].c_str(), num_data);
+
+            std::vector<unsigned char> buffer_all;
+            buffer_all.insert(buffer_all.begin(), &recv_buf[0], &recv_buf[num_data]);
+            this->q_buffer.push(buffer_all);
             return 0;
         };
     }
@@ -468,69 +467,132 @@ int TCPclient::recv_msg(const int client_fd, msg_queue& msg_wts, thread_pool& th
     };
 };
 
-void TCPclient::process_on_buffer_recv(const unsigned char buffer[], const long num_data, msg_queue& msg_wts, const int client_oder)
+void TCPclient::get_msg_buffer(const int client_oder, msg_queue& msg_wts, thread_pool& threads)
 {
-    // Process
-    std::unique_lock<std::mutex> lock_buffer(this -> buffer_mutex);
-    std::vector<unsigned char> buffer_all;
-    buffer_all = this -> buffer;
-    buffer_all.insert(buffer_all.end(), &buffer[0], &buffer[num_data]);
-    this->buffer.clear();
-
-    while(buffer_all.size() > 0)
+    while(!end_connection[client_oder])
     {
-        msg_text msg_get;
-        bool is_msg_usable = this->unpacked_msg(msg_get, buffer_all);
-        if (!is_msg_usable)
+        if(!(this->q_buffer.empty()))
         {
-            this->buffer = buffer_all;
-            break;
+            std::vector<unsigned char> buffer_all;
+            std::vector<unsigned char> buffer_element = this->q_buffer.front();
+            buffer_all = this -> buffer;
+            buffer_all.insert(buffer_all.end(), buffer_element.begin(), buffer_element.end());
+            this->buffer.clear();
+
+            while (buffer_all.size() > 0)
+            {
+                msg_text msg_get;
+                bool is_msg_usable = this->unpacked_msg(msg_get, buffer_all);
+                if (!is_msg_usable)
+                {
+                    this->buffer = buffer_all;
+                    break;
+                }
+                else
+                {
+                    if(RSP == msg_get.type_msg)
+                    {
+                        this->msg_confirm(msg_get);
+                    }
+                    else
+                    {
+                        // Push rsp
+                        msg_text rsp;
+                        rsp.type_msg = RSP;
+                        rsp.ID = msg_get.ID;
+
+                        std::vector<unsigned char> element;
+                        this -> packed_msg(rsp, element);
+                        msg_wts.push(element, Q_RSP);
+
+                        std::unique_lock<std::mutex> lock_buffer(log_mutext);
+                        printf("=> Message %d for client %s from server: %s \n", static_cast<int>(msg_get.ID), user_name[client_oder].c_str(),msg_get.msg.c_str());
+
+                        // Analyzer ping-pong
+                        vector<string> container;
+                        splits_string_2(msg_get.msg, container);
+
+                        if(ping_pong[client_oder] == 0)
+                        {
+                            msg_text msg_ping_pong;
+                            msg_ping_pong.type_msg = MSG;
+                            msg_ping_pong.msg = container[0]+ "/" + msg_get.msg.substr(container[0].size()+1, msg_get.msg.size() - container[0].size()-1);
+
+                            std::vector<unsigned char> element_msg;
+                            this -> packed_msg(msg_ping_pong, element_msg);
+                            msg_wts.push(element_msg, MSG);
+                        };
+
+                        if(container.size() == 2)
+                        {
+                            ping_pong[client_oder] -= 1;
+                            if (ping_pong[client_oder]<0)
+                            {
+                                ping_pong[client_oder] = 0;
+                            };
+                        };
+                    };
+
+//                    threads.enqueue([&,msg_get,client_oder, this]()
+//                    {
+//                        this->process_on_buffer_recv(msg_get, msg_wts, client_oder);
+//                    });
+                };
+            };
+            this->q_buffer.pop();
         }
         else
         {
-            if(RSP == msg_get.type_msg)
-            {
-                this->msg_confirm(msg_get);
-            }
-            else
-            {
-                // Push rsp
-                msg_text rsp;
-                rsp.type_msg = RSP;
-                rsp.ID = msg_get.ID;
-
-                std::vector<unsigned char> element;
-                this -> packed_msg(rsp, element);
-                msg_wts.push(element, Q_RSP);
-
-                std::unique_lock<std::mutex> lock_buffer(log_mutext);
-                printf("Message %d for client %s from server: %s \n", static_cast<int>(msg_get.ID), user_name[client_oder].c_str(),msg_get.msg.c_str());
-
-                // Analyzer ping-pong
-                if(ping_pong[client_oder] == 0)
-                {
-                    vector<string> container;
-                    splits_string_2(msg_get.msg, container);
-
-                    msg_text msg_ping_pong;
-                    msg_ping_pong.type_msg = MSG;
-                    msg_ping_pong.msg = container[0]+ "/" + msg_get.msg.substr(container[0].size()+1, msg_get.msg.size() - container[0].size()-1);
-
-                    std::vector<unsigned char> element_msg;
-                    this -> packed_msg(msg_ping_pong, element_msg);
-                    msg_wts.push(element_msg, MSG);
-                };
-
-                ping_pong[client_oder] -= 1;
-                if (ping_pong[client_oder]<0)
-                {
-                    ping_pong[client_oder] = 0;
-                };
-            };
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
         };
     };
-    lock_buffer.unlock();
 }
+
+void TCPclient::process_on_buffer_recv(const msg_text msg_get, msg_queue& msg_wts, const int client_oder)
+{
+    if(RSP == msg_get.type_msg)
+    {
+        this->msg_confirm(msg_get);
+    }
+    else
+    {
+        // Push rsp
+        msg_text rsp;
+        rsp.type_msg = RSP;
+        rsp.ID = msg_get.ID;
+
+        std::vector<unsigned char> element;
+        this -> packed_msg(rsp, element);
+        msg_wts.push(element, Q_RSP);
+
+        std::unique_lock<std::mutex> lock_buffer(log_mutext);
+        printf("Message %d for client %s from server: %s \n", static_cast<int>(msg_get.ID), user_name[client_oder].c_str(),msg_get.msg.c_str());
+
+        // Analyzer ping-pong
+//        vector<string> container;
+//        splits_string_2(msg_get.msg, container);
+
+//        if(ping_pong[client_oder] == 0)
+//        {
+//            msg_text msg_ping_pong;
+//            msg_ping_pong.type_msg = MSG;
+//            msg_ping_pong.msg = container[0]+ "/" + msg_get.msg.substr(container[0].size()+1, msg_get.msg.size() - container[0].size()-1);
+
+//            std::vector<unsigned char> element_msg;
+//            this -> packed_msg(msg_ping_pong, element_msg);
+//            msg_wts.push(element_msg, MSG);
+//        };
+
+//        if(container.size() == 2)
+//        {
+//            ping_pong[client_oder] -= 1;
+//            if (ping_pong[client_oder]<0)
+//            {
+//                ping_pong[client_oder] = 0;
+//            };
+//        };
+    };
+};
 
 void TCPclient::timeout_clocker(const int client_oder)
 {
@@ -547,7 +609,7 @@ void TCPclient::timeout_clocker(const int client_oder)
                 if(duration.count() > timeout)
                 {
                     this -> ping = true;
-                    printf("=> Start new PING \n");
+                    printf("=> Start new PING %d\n", rps_timeout_list.front().msg.ID);
                 };
             }
             else
@@ -569,7 +631,7 @@ void TCPclient::timeout_clocker(const int client_oder)
                             std::chrono::duration<float> duration = std::chrono::system_clock::now() - rps_timeout_list[i].timeout;
                             if (duration.count() > timeout)
                             {
-                                printf("   PING timeout !!! \n");
+                                printf("   PING timeout %d!!! \n", rps_timeout_list[i].msg.ID);
                                 rps_timeout_list.erase(rps_timeout_list.begin()+static_cast<long>(i));
                                 end_connection[client_oder] = true;
                                 is_error[client_oder] = true;

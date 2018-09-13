@@ -12,7 +12,7 @@
 #include <sys/event.h>
 #include <unistd.h>
 
-#define NUM_CLIENT 25
+#define NUM_CLIENT 3
 
 #include "msgqueue.h"
 #include "tcphelper.h"
@@ -41,12 +41,12 @@ void load_cmd(const int client_oder, TCPclient& client_helper, msg_queue& msg_wt
 
 bool is_reconnect(int& client_fd);
 
-void send_from_file(bool& stop_read_file, const std::string user_forward, TCPclient& client_helper, msg_queue& msg_wts);
+void send_from_file(bool& stop_read_file, const std::string user_forward, TCPclient& client_helper, msg_queue& msg_wts, const int client_oder);
 
 std::vector<file_infor> getDirectoryFiles(const std::string& dir, const char* ext);
 
 bool is_wts(vector<file_infor> files_list, file_infor file);
 
-bool push_file(file_infor file, TCPclient& client_helper, msg_queue& msg_wts, string user_forward);
+bool push_file(file_infor file, TCPclient& client_helper, msg_queue& msg_wts, string user_forward, const int client_oder);
 
 #endif // IOSOCKET_H

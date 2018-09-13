@@ -74,12 +74,12 @@ void read_terminal()
                         };
                         if(!is_client_name)
                         {
-                            printf("=> Sr client %s don't have in the list!! \n", container[0].c_str());
+                            printf("=> Sorry client %s don't have in the list!! \n", container[0].c_str());
                         }
                     }
                     else
                     {
-                         printf("=> Wrong format message or no massge to send !! \n");
+                        printf("=> Wrong format message or no massge to send !! \n");
                     };
                 };
             };
@@ -99,7 +99,7 @@ void read_terminal()
     // Clear queue
     while(user_cmd.size()>0)
     {
-       user_cmd.pop();
+        user_cmd.pop();
     };
 }
 
@@ -136,13 +136,17 @@ void load_cmd(const int client_oder, TCPclient& client_helper, msg_queue& msg_wt
                         else if (!container[1].compare("file"))
                         {
                             stop_read_file = false;
-                            threads.enqueue(send_from_file, ref(stop_read_file), container[2], ref(client_helper), ref(msg_wts));
+                            threads.enqueue(send_from_file, ref(stop_read_file), container[2], ref(client_helper), ref(msg_wts), client_oder);
                         }
                         else if (!container[1].compare("un_file"))
                         {
                             stop_read_file = true;
                         }
-                        else
+                        else if(!container[1].compare("all"))
+                        {
+                            printf("=> Sorry, broadcase and ping-pong do not apply at sametime for muti-client !!! \n");
+                        }
+                        else if(container.size()>=3)
                         {
                             msg_text msg_send;
                             msg_send.msg = user_cmd_str.substr(container[0].size()+1, user_cmd_str.size() - container[0].size()-1);
@@ -152,9 +156,13 @@ void load_cmd(const int client_oder, TCPclient& client_helper, msg_queue& msg_wt
                             client_helper.packed_msg(msg_send, element);
                             msg_wts.push(element, Q_MSG);
 
-//                            // Analyzer ping-pong
-//                            ping_pong[client_oder] += 1;
-                        };
+                            // Analyzer ping-pong
+                            ping_pong[client_oder] += 1;
+                        }
+                        else
+                        {
+                            printf("=> Empty msg to send !!! \n");
+                        }
                     }
                     else
                     {
@@ -168,7 +176,7 @@ void load_cmd(const int client_oder, TCPclient& client_helper, msg_queue& msg_wt
                     printf("=> Wrong format message or no massge to send !! \n");
 
                 };
-                usleep(1000);
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }
             else
             {
@@ -180,13 +188,13 @@ void load_cmd(const int client_oder, TCPclient& client_helper, msg_queue& msg_wt
         }
         else
         {
-            usleep(1000);
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
         };
     };
 
     // Stop thread read file.
     stop_read_file = true;
-    usleep(1000);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
 };
 
 // Confirm exit from user
@@ -309,7 +317,7 @@ bool is_wts(vector<file_infor> files_list, file_infor file)
     return true;
 };
 
-bool push_file(file_infor file, TCPclient& client_helper, msg_queue& msg_wts, string user_forward)
+bool push_file(file_infor file, TCPclient& client_helper, msg_queue& msg_wts, string user_forward, const int client_oder)
 {
     int fd;
     off_t bytes_readed;
@@ -332,6 +340,8 @@ bool push_file(file_infor file, TCPclient& client_helper, msg_queue& msg_wts, st
         std::vector<unsigned char> element;
         client_helper.packed_msg(msg_send, element);
         msg_wts.push(element, Q_MSG);
+        ping_pong[client_oder] += 1;
+//        std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
         memset(&buffer, 0, sizeof(buffer));
 
@@ -341,13 +351,13 @@ bool push_file(file_infor file, TCPclient& client_helper, msg_queue& msg_wts, st
     return true;
 };
 
-void send_from_file(bool& stop_read_file, const std::string user_forward, TCPclient& client_helper, msg_queue& msg_wts)
+void send_from_file(bool& stop_read_file, const std::string user_forward, TCPclient& client_helper, msg_queue& msg_wts, const int client_oder)
 {
     // Send all file for the first time
     vector<file_infor> files = getDirectoryFiles("../build-multiClientSocketTCP-Desktop_Qt_5_11_1_clang_64bit-Debug/filemsg", "txt");
     for (unsigned long i=0; i< files.size(); i++)
     {
-        push_file(files[i], client_helper, msg_wts, user_forward);
+        push_file(files[i], client_helper, msg_wts, user_forward, client_oder);
     };
 
     // Check change in foder and start resend file
@@ -386,7 +396,7 @@ void send_from_file(bool& stop_read_file, const std::string user_forward, TCPcli
             {
                 if(is_wts(files, new_files[i]))
                 {
-                    push_file(new_files[i], client_helper, msg_wts, user_forward);
+                    push_file(new_files[i], client_helper, msg_wts, user_forward, client_oder);
                 };
             };
             files = new_files;

@@ -308,6 +308,7 @@ void TCPhelper::msg_confirm(const msg_text rsp)
     {
         if(rps_timeout_list[i].msg.ID == rsp.ID)
         {
+            printf("=> Get rsp for msg %d \n", rsp.ID);
             rps_timeout_list.erase(rps_timeout_list.begin()+static_cast<long>(i));
             break;
         };
