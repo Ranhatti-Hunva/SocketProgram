@@ -67,11 +67,12 @@ public:
                   thread_pool &poolThread, std::vector<timeoutNode> &timeoutList,
                   msgQueue &qSend, std::mutex &mt);
     void sendThread(msgQueue &qSend, std:: mutex &mt);
+    void handlQrecv(std::vector <nodeRecv> &dataRecv);
 
 private:
 
     std::vector<int> clientFds;
-
+    int total = 0;
     long int timeOut = 20000;
     //fd_set listener; //listener file decriptor list
     fd_set read_fds; //temp file descritopr list for select

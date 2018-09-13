@@ -163,8 +163,8 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
     struct timeval tv;
     //std::unique_ptr<char>a(new char[10]);
     //std::unique_ptr<char> bufSend (new char[2048]);
-    char * bufSend = new char [2048];
-    memset(bufSend,0,2048);
+    char * bufSend = new char [4096];
+    memset(bufSend,0,4096);
 
     //std::unique_ptr<char> dataMsg (new char(strlen(msg)));
 
@@ -181,7 +181,7 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
         strcpy(nameClient,strMsg.substr(0,found).c_str());
         //std::string a = strMsg.substr(0,found);
 
-        std::cout<<"\nTen nguoi muon gui "<<std::string(nameClient,0,found)<<"\n";
+        std::cout<<"\n==> Ten nguoi muon gui "<<std::string(nameClient,0,found)<<"\n";
 
         std::map<std::string,int> mapClient;
         std::map<std::string,int>::iterator it;
@@ -203,7 +203,7 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
                     std::cout<<"data msg: "<< msgData << "\n";
 
                     strcat(bufSend,clientList[i].name);
-                    strcat(bufSend,": ");
+                    strcat(bufSend,">");
                     strcat(bufSend,msgData.c_str());
                 }
                 else{
@@ -283,19 +283,19 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
                     node.len = len;
                     node.socket = clientList[posClient].socketfd;
                     node.msgID = msgSend.ID;
-
+                    usleep(1000);
                     qSend.pushQ(node);
                     //mt.unlock();
                     //send(clientList[posClient].socketfd,buffer,sizeof(buffer),0);
                     //qMsgSend.push(node);
 
                     //mtx.lock();
-                    gettimeofday(&tv, nullptr);
-                    timeoutNode to;
-                    to.timeout = tv.tv_sec*1000 + tv.tv_usec/1000 ;
-                    to.msgID = msgSend.ID;
-                    to.socket = clientList[posClient].socketfd;
-                    timeoutList.push_back(to);
+//                    gettimeofday(&tv, nullptr);
+//                    timeoutNode to;
+//                    to.timeout = tv.tv_sec*1000 + tv.tv_usec/1000 ;
+//                    to.msgID = msgSend.ID;
+//                    to.socket = clientList[posClient].socketfd;
+//                    timeoutList.push_back(to);
                     //usleep(100);
                     mt.unlock();
                 }
@@ -312,7 +312,7 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
                     // Format time, "ddd yyyy-mm-dd hh:mm:ss zzz"
                     ts = *localtime(&now);
                     strftime(buf, sizeof(buf), "%a %Y-%m-%d %H:%M:%S", &ts);
-                    outfile << bufSend <<" --- "<< buf <<std::endl;
+                    outfile << bufSend /*<<" --- "<< buf */<<std::endl;
                     outfile.close();
                     std::cout<< "store msg !\n";
 

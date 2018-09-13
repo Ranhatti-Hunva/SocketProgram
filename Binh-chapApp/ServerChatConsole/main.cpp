@@ -4,7 +4,7 @@
 #include <iostream>
 #include "msgqueue.h"
 //-----------------------------------------------------------------------------
-#define HOST "localhost"
+#define HOST "10.42.0.127"
 #define PORT "8096"
 //-----------------------------------------------------------------------------
 void initClientList(std::vector<clientNode> &clientLst){
@@ -22,6 +22,7 @@ void initClientList(std::vector<clientNode> &clientLst){
 int main()
 {
     std:: queue <sendNode> qMsgSend;
+
     thread_pool poolThr{30};
     std::vector<timeoutNode> timeoutList;
     std::vector<clientNode> client(MAX_CLIENT);
@@ -55,9 +56,10 @@ int main()
             server.timeoutThread(ref(client),ref(timeoutList));
         });
 
-        while(1){
+        //while(1){
             server.recvData(socket,ref(client),poolThr,ref(timeoutList),qSend,mtx);
-        }
+
+        //}
 
         server.cleanUp();
     }

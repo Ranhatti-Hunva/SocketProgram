@@ -24,11 +24,11 @@
 #include "threadpool.h"
 #include <fstream>
 //---------------------------------------------------------------------------------------
-#define HOST "localhost"
+#define HOST "10.42.0.127"
 #define PORT "8096"
 #define TIME_OUT 10
 #define MAX_FILE_TXT 1024
-#define NUM_CLIENT 25
+#define NUM_CLIENT 5
 //------------variable check-------------------------------------------------------------
 std::mutex mtx;
 int stop = 0;
@@ -47,15 +47,22 @@ struct timeoutSend{
 };
 
 //------------thread receive msg from server---------------------------------------------
-void recvMsg(unsigned char *buf,int sockfd,std::vector<timeoutSend>&timeoutQ){
-    long int timeRSP = 0;
-    struct timeval tp;
+void recvMsg(unsigned char *buf,
+             int sockfd,
+             std::vector<timeoutSend>&timeoutQ,
+             std::string name,
+             std::string &hashStr,
+             std::queue<msg_text> &msgQ,
+             std::mutex &mt,
+             int &count
+             ){
+    msg_text msgSend;
     while(stop!=1){
 
-        buf = new unsigned char [2048];
-        memset(buf,0,2048);
+        buf = new unsigned char [4096];
+        memset(buf,0,4096);
 
-        int bytesRecv = recv(sockfd,buf,2048,0);
+        int bytesRecv = recv(sockfd,buf,4096,0);
         if(bytesRecv >0){
             //printf("vao \n");
             struct msg_text msg_get;
@@ -89,7 +96,11 @@ void recvMsg(unsigned char *buf,int sockfd,std::vector<timeoutSend>&timeoutQ){
                         msg_rsp.ID = msg_get.ID;
                         msg_rsp.type_msg = RSP;
                         handleMsg.packed_msg(msg_rsp,buffer);
-                        send(sockfd,buffer,9,0);
+                        //send(sockfd,buffer,10,0);
+                        mt.lock();
+                        msgQ.push(msg_rsp);
+                        mt.unlock();
+                        //std::cout << "id rps> " << msg_rsp.ID << std::endl;
                         //std::vector<timeoutSend>::iterator it;
                     }
                     if(msg_get.type_msg == RSP){
@@ -97,7 +108,7 @@ void recvMsg(unsigned char *buf,int sockfd,std::vector<timeoutSend>&timeoutQ){
 
                         usleep(1000);
 
-                        mtx.lock();
+                        mt.lock();
                         std::vector<timeoutSend>::iterator it;
                         // tim va xoa msg trong Q timeout khi nhan respond
                         if(!timeoutQ.empty()){
@@ -114,10 +125,30 @@ void recvMsg(unsigned char *buf,int sockfd,std::vector<timeoutSend>&timeoutQ){
                             }
 
                         }
-                        mtx.unlock();
+                        mt.unlock();
                     }
                     if(msg_get.msg.length() > 0){
-                        std::cout << "> " << msg_get.msg << std::endl;
+                        std::cout <<"==> Nguoi nhan "<<name<< "> " << msg_get.msg << std::endl;
+                        //                        std::size_t found = msg_get.msg.find_first_of(">");
+                        //                        if(found != std::string::npos){
+                        //                            std::string data = msg_get.msg.substr(found+1,msg_get.msg.size());
+
+                        //                            if(count == 0){
+                        //                                mt.lock();
+                        //                                msgSend.type_msg = MSG;
+                        //                                msg_get.msg[found] = '/';
+                        //                                //std::cout<<"msg "<<msg_get.msg<<"\n";
+                        //                                msgSend.msg.assign(msg_get.msg);
+                        //                                msgQ.push(msgSend);
+                        //                                mt.unlock();
+                        //                            }else{
+                        //                                count--;
+                        //                                if(count < 0){
+                        //                                    count = 0;
+                        //                                }
+                        //                            }
+
+                        //                        }
                     }
 
                 }
@@ -192,7 +223,7 @@ int getdir (std::string dir, std::vector<std::string> &files)
 //----send msg in file ------------------------------------------------------------------
 void sendMsgInFile(std::string name,
                    std::string filePath,
-                   std::queue<msg_text>&msgQ){
+                   std::queue<msg_text>&msgQ,int &count,std::mutex &mt){
 
     std::ifstream ifs(filePath, std::ios::binary|std::ios::ate);
     std::ifstream::pos_type pos = ifs.tellg();
@@ -211,10 +242,16 @@ void sendMsgInFile(std::string name,
         msg_text msgSend;
         msgSend.type_msg = MSG;
         msgSend.msg.assign(name + "/" +pChars);
-        mtx.lock();
+        mt.lock();
         msgQ.push(msgSend);
-        usleep(1000);
-        mtx.unlock();
+        //        HandleMsg handleMsg;
+        //        uint8_t a[msgSend.msg.size()+10];
+        //        handleMsg.packed_msg(msgSend,a);
+        //        send(socket,a,sizeof(a),0);
+        count++;
+        usleep(10000);
+        mt.unlock();
+
         delete []pChars;
     }
     ifs.close();
@@ -260,7 +297,7 @@ bool compareHashvalue(std::vector<fileNode>&fileList,std::string fileName){
 
 void sendFileThread(std::string name,
                     std::queue<msg_text>&msgQ,
-                    bool &stopFile){
+                    bool &stopFile,int &count,std::mutex &mt){
 
     //lay list file name
     //ghep vs ten username r send
@@ -291,7 +328,9 @@ void sendFileThread(std::string name,
 
         fileList.push_back(node);
         //gui moi
-        sendMsgInFile(name,fullName,ref(msgQ));
+        //mt.lock();
+        sendMsgInFile(name,fullName,ref(msgQ),count,mt);
+        //mt.unlock();
     }
 
     int kQ = kqueue();
@@ -327,7 +366,9 @@ void sendFileThread(std::string name,
                 if(compareHashvalue(fileList,fullName) == false){
                     // gui moi
                     //std::cout<<"co vao day\n";
-                    sendMsgInFile(name,fullName,ref(msgQ));
+
+                    sendMsgInFile(name,fullName,ref(msgQ),count,mt);
+
                 }
             }
 
@@ -345,7 +386,8 @@ struct nodeConsole{
 
 //----thread nhan tu console-------------------------------------------------------------
 
-void cinFromConsole(std::queue<nodeConsole>&csQ,std::mutex &mt,std::string (name)[]){
+void cinFromConsole(std::queue<nodeConsole>&csQ,std::mutex &mt,
+                    std::string (name)[]){
 
     struct timeval tv;
     tv.tv_sec = 0;
@@ -383,6 +425,7 @@ void cinFromConsole(std::queue<nodeConsole>&csQ,std::mutex &mt,std::string (name
                                 reconnectClient[i] = true;
                                 break;
                             }
+
                             mt.lock();
                             csQ.push(node);
                             mt.unlock();
@@ -404,7 +447,8 @@ void inputForThread(int socket,
                     thread_pool &pool,
                     std::queue<nodeConsole>&csQ,
                     std::mutex &mt,
-                    std::string name){
+                    std::string name,
+                    std::string &hashStr,int &count){
     //int socket;std::queue<msg_text>msgQ;
 
     std::string folderPath = "../readFile";
@@ -436,9 +480,9 @@ void inputForThread(int socket,
 
                     if(!username.empty()){
                         //add thread
-                        std::cout<<"usr name "<<username<<"\n";
+                        //std::cout<<"usr name "<<username<<"\n";
                         pool.enqueue([&,username]{
-                            sendFileThread(username,ref(msgQ),stopFile);
+                            sendFileThread(username,ref(msgQ),stopFile,count,mt);
                         });
                     }
 
@@ -452,7 +496,14 @@ void inputForThread(int socket,
                     msgSend.msg.assign(node.data);
 
                     mt.lock();
+                    //                    std::size_t found = node.data.find_first_of("/");
+                    //                    if(found != std::string::npos){
+                    //                        hashStr.assign(md5(node.data.substr(found+1,node.data.size())));
+                    //                        //std::cout<<"hash data "<< hashStr<<"\n";
+                    //                    }
+
                     msgQ.push(msgSend);
+                    count++;
                     mt.unlock();
 
                 }
@@ -466,7 +517,7 @@ void inputForThread(int socket,
 }
 
 //------------thread send msg to server--------------------------------------------------
-void sendMsg(int socket,std::queue<msg_text>&msgQ,std::vector<timeoutSend>&timeoutQ){
+void sendMsg(int socket,std::queue<msg_text>&msgQ,std::vector<timeoutSend>&timeoutQ,std::mutex &mt){
     HandleMsg handleMsg;
     struct timeval tp;
     while(stop!=1){
@@ -483,9 +534,10 @@ void sendMsg(int socket,std::queue<msg_text>&msgQ,std::vector<timeoutSend>&timeo
 
             //                printf("%c",msgQ.front().msg.c_str()[i]);
             //            }
-            std::cout<<"\n";
+            //std::cout<<"\n";
+            mt.lock();
             if(send(socket,buf,buferSize,0) > 0){
-                mtx.lock();
+
                 timeoutSend node;
                 node.msg = msgQ.front();
                 node.msgId = msgQ.front().ID;
@@ -496,11 +548,12 @@ void sendMsg(int socket,std::queue<msg_text>&msgQ,std::vector<timeoutSend>&timeo
                 timeoutQ.push_back(node);
 
                 msgQ.pop();
-                mtx.unlock();
+
             }
             else{
                 perror("send: ");
             }
+            mt.unlock();
             delete []buf;
 
         }
@@ -631,7 +684,7 @@ int main()
 
     thread_pool threads_master(NUM_CLIENT+1);
 
-    for(int i=0; i< NUM_CLIENT; i++)
+    for(int i = 0; i< NUM_CLIENT; i++)
     {
         name[i] = "C" + std::to_string(i);
         reconnectClient[i] = true;
@@ -642,8 +695,8 @@ int main()
         cinFromConsole(csList,mtex,name);
     });
     while(1){
-        for(int i = 0; i< 5; i++){
-            usleep(10000);
+        for(int i = 0; i< NUM_CLIENT; i++){
+            usleep(50000);
             if(reconnectClient[i] == true){
                 threads_master.enqueue([=](){
                     //std::queue<nodeConsole> csList;
@@ -654,10 +707,12 @@ int main()
                     unsigned char * bufrcv; // buf for recv data
                     std::string userInput;
                     std::vector <timeoutSend> timeoutList;
-                    thread_pool pool(5);
+                    thread_pool pool(10);
                     std:: queue <msg_text> qSend;
+                    int count = 0;
                     bool connectttt = true;
-                    while(connectttt){
+                    std::string hashStr;
+                    while(connectttt && stop != 1){
 
                         msgSend.msg.assign(name[i]);
 
@@ -687,17 +742,17 @@ int main()
 
                             // press # for logout
                             //std::thread cinConsoleThread(cinFromConsole,socket,ref(qSend),ref(pool));
-                            pool.enqueue([=,&qSend,&pool]{
-                                inputForThread(socket,qSend,pool,csList,mtex,name[i]);
+                            pool.enqueue([=,&qSend,&pool,&hashStr,&count]{
+                                inputForThread(socket,qSend,pool,csList,mtex,name[i],hashStr,count);
                             });
 
                             pool.enqueue([&]{
-                                recvMsg(bufrcv,socket,ref(timeoutList));
+                                recvMsg(bufrcv,socket,ref(timeoutList),name[i],hashStr,qSend,mtex,count);
                             });
                             //                            pool.enqueue([&]{
                             //                                timeoutThread(socket,ref(timeoutList),ref(qSend));
                             //                            });
-                            std::thread sendMsgThread(sendMsg,socket,ref(qSend),ref(timeoutList));
+                            std::thread sendMsgThread(sendMsg,socket,ref(qSend),ref(timeoutList),ref(mtex));
 
                             sendMsgThread.join();
                         }
@@ -708,9 +763,12 @@ int main()
 
                 });
                 reconnectClient[i] = false;
+
             }
 
         }
+        if(stop == 1) break;
+
     }
 
 

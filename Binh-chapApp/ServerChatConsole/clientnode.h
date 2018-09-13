@@ -3,6 +3,8 @@
 #include <iostream>
 #include <queue>
 #include <string>
+#include <vector>
+
 //-----struct Modify------------------------------------------------------------
 struct clientNode{
     char *name;
@@ -17,6 +19,11 @@ struct timeoutNode{
     int socket;
     int msgID;
     long int timeout;
+};
+
+struct nodeRecv{
+    int socket;
+    std::queue <uint8_t> data;
 };
 
 #endif // CLIENTNODE_H

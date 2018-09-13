@@ -24,7 +24,7 @@
 #include "threadpool.h"
 #include <fstream>
 //---------------------------------------------------------------------------------------
-#define HOST "localhost"
+#define HOST "10.42.0.127"
 #define PORT "8096"
 #define TIME_OUT 10
 #define MAX_FILE_TXT 1024
@@ -88,7 +88,7 @@ void recvMsg(unsigned char *buf,int sockfd,std::vector<timeoutSend>&timeoutQ){
                         //std::vector<timeoutSend>::iterator it;
                     }
                     if(msg_get.type_msg == RSP){
-                        //std::cout << "id rps> " << msg_get.ID << std::endl;
+                        std::cout << "id rps> " << msg_get.ID << std::endl;
 
                         usleep(1000);
 
