@@ -109,7 +109,7 @@ void ClientManage::sendOffClient(msgQueue &qSend,
                         msgSend.type_msg = MSG;
 
                         msgSend.msg.assign(line);
-                        unsigned char buffer[msgSend.msg.length()+9];
+                        uint8_t buffer[msgSend.msg.length()+9];
                         HandleMsg handleMsg;
                         handleMsg.packed_msg(msgSend,buffer);
 
@@ -283,19 +283,19 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
                     node.len = len;
                     node.socket = clientList[posClient].socketfd;
                     node.msgID = msgSend.ID;
-                    usleep(1000);
+                    //usleep(1000);
                     qSend.pushQ(node);
                     //mt.unlock();
                     //send(clientList[posClient].socketfd,buffer,sizeof(buffer),0);
                     //qMsgSend.push(node);
 
                     //mtx.lock();
-//                    gettimeofday(&tv, nullptr);
-//                    timeoutNode to;
-//                    to.timeout = tv.tv_sec*1000 + tv.tv_usec/1000 ;
-//                    to.msgID = msgSend.ID;
-//                    to.socket = clientList[posClient].socketfd;
-//                    timeoutList.push_back(to);
+                    gettimeofday(&tv, nullptr);
+                    timeoutNode to;
+                    to.timeout = tv.tv_sec*1000 + tv.tv_usec/1000 ;
+                    to.msgID = msgSend.ID;
+                    to.socket = clientList[posClient].socketfd;
+                    timeoutList.push_back(to);
                     //usleep(100);
                     mt.unlock();
                 }

@@ -68,6 +68,7 @@ public:
                   msgQueue &qSend, std::mutex &mt);
     void sendThread(msgQueue &qSend, std:: mutex &mt);
     void handlQrecv(std::vector <nodeRecv> &dataRecv);
+    int sendall(int socket, unsigned char *buf, int len);
 
 private:
 

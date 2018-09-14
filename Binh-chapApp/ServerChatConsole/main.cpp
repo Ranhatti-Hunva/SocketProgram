@@ -4,7 +4,7 @@
 #include <iostream>
 #include "msgqueue.h"
 //-----------------------------------------------------------------------------
-#define HOST "10.42.0.127"
+#define HOST "10.42.0.126"
 #define PORT "8096"
 //-----------------------------------------------------------------------------
 void initClientList(std::vector<clientNode> &clientLst){
@@ -37,11 +37,11 @@ int main()
     }
 
     if(server.listenSocket(socket,BACKLOG) == true){
-        std::cout<<"Server started!!!\n";        
+        std::cout<<"Server started!!!\n";
         initClientList(ref(client));
-//        poolThread.enqueue([rspMsg]{
-//            clientQSend(rspMsg);
-//        });
+        //        poolThread.enqueue([rspMsg]{
+        //            clientQSend(rspMsg);
+        //        });
 
         long arg = fcntl(socket, F_GETFL, NULL);
         arg |= O_NONBLOCK;
@@ -57,7 +57,7 @@ int main()
         });
 
         //while(1){
-            server.recvData(socket,ref(client),poolThr,ref(timeoutList),qSend,mtx);
+        server.recvData(socket,ref(client),poolThr,ref(timeoutList),qSend,mtx);
 
         //}
 

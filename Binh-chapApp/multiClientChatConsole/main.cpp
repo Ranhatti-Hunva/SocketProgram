@@ -24,11 +24,11 @@
 #include "threadpool.h"
 #include <fstream>
 //---------------------------------------------------------------------------------------
-#define HOST "10.42.0.127"
+#define HOST "10.42.0.126"
 #define PORT "8096"
 #define TIME_OUT 10
 #define MAX_FILE_TXT 1024
-#define NUM_CLIENT 5
+#define NUM_CLIENT 10
 //------------variable check-------------------------------------------------------------
 std::mutex mtx;
 int stop = 0;
@@ -54,10 +54,10 @@ void recvMsg(unsigned char *buf,
              std::string &hashStr,
              std::queue<msg_text> &msgQ,
              std::mutex &mt,
-             int &count
+             int &count,int &stopTr
              ){
     msg_text msgSend;
-    while(stop!=1){
+    while(stopTr!=1){
 
         buf = new unsigned char [4096];
         memset(buf,0,4096);
@@ -129,26 +129,28 @@ void recvMsg(unsigned char *buf,
                     }
                     if(msg_get.msg.length() > 0){
                         std::cout <<"==> Nguoi nhan "<<name<< "> " << msg_get.msg << std::endl;
-                        //                        std::size_t found = msg_get.msg.find_first_of(">");
-                        //                        if(found != std::string::npos){
-                        //                            std::string data = msg_get.msg.substr(found+1,msg_get.msg.size());
 
-                        //                            if(count == 0){
-                        //                                mt.lock();
-                        //                                msgSend.type_msg = MSG;
-                        //                                msg_get.msg[found] = '/';
-                        //                                //std::cout<<"msg "<<msg_get.msg<<"\n";
-                        //                                msgSend.msg.assign(msg_get.msg);
-                        //                                msgQ.push(msgSend);
-                        //                                mt.unlock();
-                        //                            }else{
-                        //                                count--;
-                        //                                if(count < 0){
-                        //                                    count = 0;
-                        //                                }
-                        //                            }
+                        //ping pong msg
+                        std::size_t found = msg_get.msg.find_first_of(">");
+                        if(found != std::string::npos){
+                            std::string data = msg_get.msg.substr(found+1,msg_get.msg.size());
+                            mt.lock();
+                            if(count == 0){
 
-                        //                        }
+                                msgSend.type_msg = MSG;
+                                msg_get.msg[found] = '/';
+                                //std::cout<<"msg "<<msg_get.msg<<"\n";
+                                msgSend.msg.assign(msg_get.msg);
+                                msgQ.push(msgSend);
+
+                            }else{
+                                count--;
+                                if(count < 0){
+                                    count = 0;
+                                }
+                            }
+                            mt.unlock();
+                        }
                     }
 
                 }
@@ -234,15 +236,19 @@ void sendMsgInFile(std::string name,
     //std::cout<<"pos number  "<<pos<<"\n";
     //std::cout<<"block number  "<<numberBlock<<"\n";
     for(int i = 0; i < numberBlock; i++){
-        char *pChars = new char[block];
+        mt.lock();
+        char pChars[block] ;
         memset(pChars,0,block);
 
         ifs.read(pChars,block);
         //std::cout<<"block   "<< i << "-----------------\n"<<std::string(pChars,0,1024)<<"\n";
+
         msg_text msgSend;
         msgSend.type_msg = MSG;
+        msgSend.msg.clear();
         msgSend.msg.assign(name + "/" +pChars);
-        mt.lock();
+
+        std::cout<<"==> Size  "<< msgSend.msg.size() <<"\n";
         msgQ.push(msgSend);
         //        HandleMsg handleMsg;
         //        uint8_t a[msgSend.msg.size()+10];
@@ -250,9 +256,10 @@ void sendMsgInFile(std::string name,
         //        send(socket,a,sizeof(a),0);
         count++;
         usleep(10000);
-        mt.unlock();
 
-        delete []pChars;
+
+        //delete []pChars;
+        mt.unlock();
     }
     ifs.close();
 
@@ -393,7 +400,7 @@ void cinFromConsole(std::queue<nodeConsole>&csQ,std::mutex &mt,
     tv.tv_sec = 0;
     tv.tv_usec = 500000;
 
-    bool stopFile = false;
+    //bool stopFile = false;
 
 
     while(stop!=1){
@@ -412,6 +419,45 @@ void cinFromConsole(std::queue<nodeConsole>&csQ,std::mutex &mt,
                 stop = 1;
                 break;
             }
+            else if(strcmp(userInput.c_str(),"*") == 0){
+
+
+
+                std::ifstream ifs("../readFile/a.txt", std::ios::binary|std::ios::ate);
+                std::ifstream::pos_type pos = ifs.tellg();
+                ifs.seekg(0, std::ios::beg);
+                int block = 128; // 1/8 KB
+
+                int numberBlock = (pos/block) + 1;
+
+                for(int i = 0; i < numberBlock; i++){
+                    mt.lock();
+                    char pChars[block] ;
+                    memset(pChars,0,block);
+                    ifs.read(pChars,block);
+                    mt.unlock();
+                    //std::cout<<"block   "<< i << "-----------------\n"<<std::string(pChars,0,1024)<<"\n";
+
+                    for(int i = 0; i < NUM_CLIENT; i++){
+                        mt.lock();
+                        nodeConsole node;
+                        node.name.assign("B"+std::to_string(i));
+                        node.data.assign("V"+std::to_string(i)+"/"+pChars);
+                        csQ.push(node);
+                        usleep(1000);
+                        mt.unlock();
+                    }
+
+                    usleep(10000);
+                    //                    if(sizeof(pChars) != block){
+                    //                        break;
+                    //                    }
+                    //mt.unlock();
+                }
+                ifs.close();
+                userInput.clear();
+
+            }
             else if(userInput.size() >0){
                 nodeConsole node;
                 std::size_t found = userInput.find_first_of("/");
@@ -420,13 +466,17 @@ void cinFromConsole(std::queue<nodeConsole>&csQ,std::mutex &mt,
                     node.data = userInput.substr(found+1,userInput.size());
                     //std::cout<<node.data<<'\n';
                     for(int i = 0 ; i < NUM_CLIENT ; i++){
+
                         if(strcmp(node.name.c_str(),name[i].c_str()) == 0){
+                            //std::cout<<"==> data "<<node.data<<"\n";
+
                             if(strcmp(node.data.c_str(),"rc") == 0){
+                                //std::cout<<"co vao\n";
                                 reconnectClient[i] = true;
                                 break;
                             }
-
                             mt.lock();
+                            //std::cout<<"node co vao " << node.data << "\n";
                             csQ.push(node);
                             mt.unlock();
 
@@ -448,7 +498,7 @@ void inputForThread(int socket,
                     std::queue<nodeConsole>&csQ,
                     std::mutex &mt,
                     std::string name,
-                    std::string &hashStr,int &count){
+                    std::string &hashStr,int &count,int &stopTr){
     //int socket;std::queue<msg_text>msgQ;
 
     std::string folderPath = "../readFile";
@@ -460,7 +510,7 @@ void inputForThread(int socket,
     bool stopFile = false;
     //std::queue<nodeConsole> csQThread;
 
-    while(stop!=1){
+    while(stopTr!=1){
         //csQThread = csQ;
         if(!csQ.empty()){
             nodeConsole node;
@@ -468,10 +518,12 @@ void inputForThread(int socket,
             node.data.assign(csQ.front().data);
             if(strcmp(node.name.c_str(),name.c_str()) == 0){
                 if(strcmp(node.data.c_str(),"#") == 0){
-                    close(socket);
                     mt.lock();
+                    close(socket);
+                    stopTr = 1;
                     csQ.pop();
                     mt.unlock();
+
                     break;
                 }
                 else if(strcmp(node.data.substr(0,4).c_str(),"file") == 0){
@@ -491,11 +543,11 @@ void inputForThread(int socket,
                     stopFile = true;
                 }
                 else if(node.data.size() >0){
-
+                    mt.lock();
                     msgSend.type_msg = MSG;
                     msgSend.msg.assign(node.data);
 
-                    mt.lock();
+
                     //                    std::size_t found = node.data.find_first_of("/");
                     //                    if(found != std::string::npos){
                     //                        hashStr.assign(md5(node.data.substr(found+1,node.data.size())));
@@ -515,14 +567,34 @@ void inputForThread(int socket,
     }
 
 }
+//----------------------------------------------------------------------------------------
+int sendall(int socket,unsigned char *buf, int &len)
+{
+    int total = 0;        // how many bytes we've sent
+    int bytesleft = len; // how many we have left to send
+    int n;
+
+    while(total < len) {
+        n = send(socket, buf+total, std::min(bytesleft,len), 0);
+        if (n == -1) { break; }
+        total += n;
+        bytesleft -= n;
+    }
+
+    len = total; // return number actually sent here
+
+    return n==-1?-1:0; // return -1 on failure, 0 on success
+}
 
 //------------thread send msg to server--------------------------------------------------
-void sendMsg(int socket,std::queue<msg_text>&msgQ,std::vector<timeoutSend>&timeoutQ,std::mutex &mt){
+void sendMsg(int socket,std::queue<msg_text>&msgQ,
+             std::vector<timeoutSend>&timeoutQ,std::mutex &mt,int &stopTr){
     HandleMsg handleMsg;
     struct timeval tp;
-    while(stop!=1){
+    while(stopTr!=1){
         if(!msgQ.empty()){
-            int buferSize = msgQ.front().msg.length()+10;
+            mt.lock();
+            int buferSize = msgQ.front().msg.length()+9;
 
             unsigned char *buf = new unsigned char [buferSize];
             memset(buf,0,buferSize);
@@ -535,19 +607,22 @@ void sendMsg(int socket,std::queue<msg_text>&msgQ,std::vector<timeoutSend>&timeo
             //                printf("%c",msgQ.front().msg.c_str()[i]);
             //            }
             //std::cout<<"\n";
-            mt.lock();
-            if(send(socket,buf,buferSize,0) > 0){
 
+            //std::cout <<"==> numSend 2 "<< buferSize <<"\n";
+            int numSend = sendall(socket,buf,buferSize);
+            if( numSend == 0){
+
+                //std::cout<<"==> numSend " << buferSize <<"\n";
                 timeoutSend node;
                 node.msg = msgQ.front();
                 node.msgId = msgQ.front().ID;
                 gettimeofday(&tp, nullptr);
                 node.time = tp.tv_sec*1000 +tp.tv_usec/1000;
                 //std::cout<<"send id "<<node.msgId<<"\n";
-                usleep(2000);
-                timeoutQ.push_back(node);
 
+                timeoutQ.push_back(node);
                 msgQ.pop();
+                usleep(2000);
 
             }
             else{
@@ -644,6 +719,7 @@ void timeoutThread(int socket,std::vector<timeoutSend>&timeoutQ,std::queue<msg_t
     }
 }
 
+
 //------------reconnect function---------------------------------------------------------
 bool isReconnect(std::vector<timeoutSend>&timeoutQ){
     std::string ans;
@@ -686,18 +762,22 @@ int main()
 
     for(int i = 0; i< NUM_CLIENT; i++)
     {
-        name[i] = "C" + std::to_string(i);
+        name[i] = "B" + std::to_string(i);
         reconnectClient[i] = true;
     }
 
     //std::thread cinConsoleThread(cinFromConsole,socket,ref(qSend),ref(pool));
-    threads_master.enqueue([&]{
-        cinFromConsole(csList,mtex,name);
-    });
+    std::thread cinConsoleThread(cinFromConsole,ref(csList),ref(mtex),ref(name));
+    //    threads_master.enqueue([&]{
+    //        cinFromConsole(csList,mtex,name);
+    //    });
     while(1){
         for(int i = 0; i< NUM_CLIENT; i++){
             usleep(50000);
+            //sleep(2);
+            //std::cout << "==> num licen " << reconnectClient[i] << "\n";
             if(reconnectClient[i] == true){
+                //std::cout << "==> co vao ano " << reconnectClient[i] << "\n";
                 threads_master.enqueue([=](){
                     //std::queue<nodeConsole> csList;
                     //std::mutex mtex;
@@ -711,8 +791,9 @@ int main()
                     std:: queue <msg_text> qSend;
                     int count = 0;
                     bool connectttt = true;
+                    int stopTr = 0;
                     std::string hashStr;
-                    while(connectttt && stop != 1){
+                    while(connectttt && (stop != 1 || stopTr == 0)){
 
                         msgSend.msg.assign(name[i]);
 
@@ -742,17 +823,20 @@ int main()
 
                             // press # for logout
                             //std::thread cinConsoleThread(cinFromConsole,socket,ref(qSend),ref(pool));
-                            pool.enqueue([=,&qSend,&pool,&hashStr,&count]{
-                                inputForThread(socket,qSend,pool,csList,mtex,name[i],hashStr,count);
+                            pool.enqueue([=,&qSend,&pool,&hashStr,&count,&stopTr]{
+                                inputForThread(socket,qSend,pool,csList,mtex,name[i],hashStr,count,stopTr);
                             });
 
                             pool.enqueue([&]{
-                                recvMsg(bufrcv,socket,ref(timeoutList),name[i],hashStr,qSend,mtex,count);
+                                recvMsg(bufrcv,socket,ref(timeoutList),name[i],hashStr,qSend,mtex,count,stopTr);
                             });
                             //                            pool.enqueue([&]{
                             //                                timeoutThread(socket,ref(timeoutList),ref(qSend));
                             //                            });
-                            std::thread sendMsgThread(sendMsg,socket,ref(qSend),ref(timeoutList),ref(mtex));
+                            //                            pool.enqueue([&]{
+                            //                                sendMsg(socket,ref(qSend),ref(timeoutList),ref(mtex),stopTr);
+                            //                            });
+                            std::thread sendMsgThread(sendMsg,socket,ref(qSend),ref(timeoutList),ref(mtex),std::ref(stopTr));
 
                             sendMsgThread.join();
                         }

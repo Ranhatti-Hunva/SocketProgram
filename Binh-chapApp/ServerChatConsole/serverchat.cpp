@@ -69,6 +69,25 @@ bool ServerChat::listenSocket(int sock, int backLog){
     return true;
 }
 //---------------------------------------------------------------------------------------
+int ServerChat::sendall(int socket,unsigned char *buf, int len)
+{
+    int total = 0;        // how many bytes we've sent
+    int bytesleft = len; // how many we have left to send
+    int n;
+
+    while(total < len) {
+        n = send(socket, buf+total, std::min(bytesleft,len), 0);
+        if (n == -1) { break; }
+        total += n;
+        bytesleft -= n;
+    }
+
+    len = total; // return number actually sent here
+
+    return n==-1?-1:0; // return -1 on failure, 0 on success
+}
+
+//---------------------------------------------------------------------------------------
 
 void ServerChat::sendThread( msgQueue &qSend, std::mutex &mt){
     timeval tv;
@@ -78,7 +97,7 @@ void ServerChat::sendThread( msgQueue &qSend, std::mutex &mt){
 
         if(!qSend.isEmpty()){
 
-
+            mt.lock();
             fd_set sendFds;
             FD_ZERO(&sendFds);
             FD_SET(qSend.frontQ().socket,&sendFds);
@@ -93,18 +112,19 @@ void ServerChat::sendThread( msgQueue &qSend, std::mutex &mt){
 
                 //                    printf("%d",qSend.frontQ().buf[i]);
                 //                }
-                mt.lock();
-                long int numSend = send(qSend.frontQ().socket,
-                                        qSend.frontQ().buf,
-                                        qSend.frontQ().len,0);
-                if(numSend < 0){
+
+                long int numSend = sendall(qSend.frontQ().socket,
+                                           qSend.frontQ().buf,
+                                           qSend.frontQ().len);
+                if(numSend != 0){
                     perror("send :");
                 }
 
                 qSend.popQ();
-                mt.unlock();
+
 
             }
+            mt.unlock();
         }
 
     }
@@ -131,12 +151,12 @@ void ServerChat::clientQRecv(struct msg_text msgHandle,
 
     switch(msgHandle.type_msg){
     case SGI:
-        mtx.lock();
+        //mtx.lock();
         skExist = cliManage.mapClientWithSocket(clientList,msgHandle.socketfd,msgbuf,read_fds,mt);
         if(skExist != -1){
             FD_CLR(skExist,&read_fds);
         }
-        mtx.unlock();
+        //mtx.unlock();
         //        for(int i = 0 ; i < MAX_CLIENT ; i++){
         //            if(clientList[i].status == true){
         //                std::cout<<"Name client online "<< std::string(clientList[i].name,0,20) <<" socket "<< clientList[i].socketfd<<"\n";
@@ -151,9 +171,9 @@ void ServerChat::clientQRecv(struct msg_text msgHandle,
 
     case MSG:
         //push msg will send (msg, socket)
-        mtx.lock();
+        //mtx.lock();
         cliManage.sendMsgToClient(clientList,msgbuf,msgHandle.socketfd,timeoutList,qSend,mt);
-        mtx.unlock();
+        //mtx.unlock();
         break;
     case RSP:
         //mtx.lock();
@@ -223,13 +243,6 @@ void ServerChat::recvData(int serverFd,
                           thread_pool &poolThread,
                           std::vector<timeoutNode> &timeoutList,
                           msgQueue &qSend,std::mutex &mt){
-    //    FD_ZERO(&listener);
-    //    //FD_ZERO(&read_fds);
-    //    FD_SET(serverFd, &listener);
-    //fdmax = serverFd;
-    //std::mutex mta;
-    //read_fds = listener;
-
 
     while(1){
 
@@ -331,9 +344,9 @@ void ServerChat::recvData(int serverFd,
 
                     std::vector<uint8_t> buffer;
                     buffer.insert(buffer.end(),&buf.get()[0],&buf.get()[nbytes]);
-                    total +=nbytes;
-                    std::cout<<"byte recv =====> "<<nbytes<<"\n";
-                    std::cout<<"total recv =====> "<<total<<"\n";
+//                    total +=nbytes;
+//                    std::cout<<"byte recv =====> "<<nbytes<<"\n";
+//                    std::cout<<"total recv =====> "<<total<<"\n";
 
                     while(buffer.size()>0){
                         msg_text recvMsg,rspMsg;

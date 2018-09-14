@@ -42,15 +42,17 @@ struct timeoutSend{
 };
 
 //------------thread receive msg from server---------------------------------------------
-void recvMsg(unsigned char *buf,int sockfd,std::vector<timeoutSend>&timeoutQ){
+void recvMsg(unsigned char *buf,int sockfd,
+             std::vector<timeoutSend>&timeoutQ,
+             std::mutex &mt){
     long int timeRSP = 0;
     struct timeval tp;
     while(stop!=1){
 
-        buf = new unsigned char [2048];
-        memset(buf,0,2048);
+        buf = new unsigned char [4096];
+        memset(buf,0,4096);
 
-        int bytesRecv = recv(sockfd,buf,2048,0);
+        int bytesRecv = recv(sockfd,buf,4096,0);
         if(bytesRecv >0){
             //printf("vao \n");
             struct msg_text msg_get;
@@ -92,7 +94,7 @@ void recvMsg(unsigned char *buf,int sockfd,std::vector<timeoutSend>&timeoutQ){
 
                         usleep(1000);
 
-                        mtx.lock();
+                        mt.lock();
                         std::vector<timeoutSend>::iterator it;
                         // tim va xoa msg trong Q timeout khi nhan respond
                         if(!timeoutQ.empty()){
@@ -109,7 +111,7 @@ void recvMsg(unsigned char *buf,int sockfd,std::vector<timeoutSend>&timeoutQ){
                             }
 
                         }
-                        mtx.unlock();
+                        mt.unlock();
                     }
                     if(msg_get.msg.length() > 0){
                         std::cout << "> " << msg_get.msg << std::endl;
@@ -230,7 +232,7 @@ int getdir (std::string dir, std::vector<std::string> &files)
 //----send msg in file ------------------------------------------------------------------
 void sendMsgInFile(std::string name,
                    std::string filePath,
-                   std::queue<msg_text>&msgQ){
+                   std::queue<msg_text>&msgQ,std::mutex &mt){
 
     std::ifstream ifs(filePath, std::ios::binary|std::ios::ate);
     std::ifstream::pos_type pos = ifs.tellg();
@@ -241,7 +243,8 @@ void sendMsgInFile(std::string name,
     //std::cout<<"pos number  "<<pos<<"\n";
     //std::cout<<"block number  "<<numberBlock<<"\n";
     for(int i = 0; i < numberBlock; i++){
-        char *pChars = new char[block];
+        mt.lock();
+        char pChars[block];
         memset(pChars,0,block);
 
         ifs.read(pChars,block);
@@ -249,11 +252,12 @@ void sendMsgInFile(std::string name,
         msg_text msgSend;
         msgSend.type_msg = MSG;
         msgSend.msg.assign(name + "/" +pChars);
-        mtx.lock();
+
         msgQ.push(msgSend);
-        usleep(1000);
-        mtx.unlock();
-        delete []pChars;
+        usleep(10000);
+
+        //delete []pChars;
+        mt.unlock();
     }
     ifs.close();
 
@@ -298,7 +302,7 @@ bool compareHashvalue(std::vector<fileNode>&fileList,std::string fileName){
 
 void sendFileThread(std::string name,
                     std::queue<msg_text>&msgQ,
-                    bool &stopFile){
+                    bool &stopFile,std::mutex &mt){
 
     //lay list file name
     //ghep vs ten username r send
@@ -329,7 +333,7 @@ void sendFileThread(std::string name,
 
         fileList.push_back(node);
         //gui moi
-        sendMsgInFile(name,fullName,ref(msgQ));
+        sendMsgInFile(name,fullName,ref(msgQ),mt);
     }
 
     int kQ = kqueue();
@@ -365,7 +369,7 @@ void sendFileThread(std::string name,
                 if(compareHashvalue(fileList,fullName) == false){
                     // gui moi
                     //std::cout<<"co vao day\n";
-                    sendMsgInFile(name,fullName,ref(msgQ));
+                    sendMsgInFile(name,fullName,ref(msgQ),mt);
                 }
             }
 
@@ -380,7 +384,7 @@ void sendFileThread(std::string name,
 
 void cinFromConsole(int socket,
                     std::queue<msg_text>&msgQ,
-                    thread_pool &pool){
+                    thread_pool &pool,std::mutex &mt){
     //int socket;std::queue<msg_text>msgQ;
 
     std::string folderPath = "../readFile";
@@ -430,7 +434,7 @@ void cinFromConsole(int socket,
                     //add thread
                     std::cout<<"usr name "<<username<<"\n";
                     pool.enqueue([&,username]{
-                        sendFileThread(username,ref(msgQ),stopFile);
+                        sendFileThread(username,ref(msgQ),stopFile,mt);
                     });
                 }
 
@@ -499,23 +503,42 @@ void cinFromConsole(int socket,
                 msgSend.type_msg = MSG;
                 msgSend.msg.assign(userInput);
 
-                mtx.lock();
+                mt.lock();
                 msgQ.push(msgSend);
-                mtx.unlock();
+                mt.unlock();
 
                 userInput.clear();
             }
         }
     }
 }
+//----------------------------------------------------------------------------------------
+int sendall(int socket,unsigned char *buf, int &len)
+{
+    int total = 0;        // how many bytes we've sent
+    int bytesleft = len; // how many we have left to send
+    int n;
 
+    while(total < len) {
+        n = send(socket, buf+total, std::min(bytesleft,len), 0);
+        if (n == -1) { break; }
+        total += n;
+        bytesleft -= n;
+    }
+
+    len = total; // return number actually sent here
+
+    return n==-1?-1:0; // return -1 on failure, 0 on success
+}
 
 //------------thread send msg to server--------------------------------------------------
-void sendMsg(int socket,std::queue<msg_text>&msgQ,std::vector<timeoutSend>&timeoutQ){
+void sendMsg(int socket,std::queue<msg_text>&msgQ,
+             std::vector<timeoutSend>&timeoutQ,std::mutex &mt){
     HandleMsg handleMsg;
     struct timeval tp;
     while(stop!=1){
         if(!msgQ.empty()){
+            mt.lock();
             int buferSize = msgQ.front().msg.length()+9;
 
             unsigned char *buf = new unsigned char [buferSize];
@@ -529,23 +552,24 @@ void sendMsg(int socket,std::queue<msg_text>&msgQ,std::vector<timeoutSend>&timeo
             //                printf("%c",msgQ.front().msg.c_str()[i]);
             //            }
             std::cout<<"\n";
-            if(send(socket,buf,buferSize,0) > 0){
-                mtx.lock();
+            int numSend = sendall(socket,buf,buferSize);
+            if(numSend == 0){
+
                 timeoutSend node;
                 node.msg = msgQ.front();
                 node.msgId = msgQ.front().ID;
                 gettimeofday(&tp, nullptr);
                 node.time = tp.tv_sec*1000 +tp.tv_usec/1000;
                 //std::cout<<"send id "<<node.msgId<<"\n";
-                usleep(2000);
-                timeoutQ.push_back(node);
 
+                timeoutQ.push_back(node);
                 msgQ.pop();
-                mtx.unlock();
+                usleep(2000);
             }
             else{
                 perror("send: ");
             }
+            mt.unlock();
             delete []buf;
 
         }
@@ -564,7 +588,8 @@ void sendPing(int socket){
 }
 
 //------------thread timeout msg --------------------------------------------------------
-void timeoutThread(int socket,std::vector<timeoutSend>&timeoutQ,std::queue<msg_text>&msgQ){
+void timeoutThread(int socket,std::vector<timeoutSend>&timeoutQ,
+                   std::queue<msg_text>&msgQ,std::mutex &mt){
     struct timeval tp;
     HandleMsg handleMsg;
     std::unique_ptr <unsigned char> buf (new unsigned char [9]);
@@ -578,7 +603,7 @@ void timeoutThread(int socket,std::vector<timeoutSend>&timeoutQ,std::queue<msg_t
                 gettimeofday(&tp, nullptr);
                 long int timePing = tp.tv_sec * 1000 + tp.tv_usec / 1000;
                 //ping and wait rsp from server
-                mtx.lock();
+                mt.lock();
                 sendPing(socket);
                 //usleep(100000);
                 while(1){
@@ -629,7 +654,7 @@ void timeoutThread(int socket,std::vector<timeoutSend>&timeoutQ,std::queue<msg_t
                     }
 
                 }
-                mtx.unlock();
+                mt.unlock();
             }
 
         }
@@ -679,7 +704,7 @@ int main()
     std::string userInput;
     std::vector <timeoutSend> timeoutList;
     thread_pool pool(10);
-
+    std::mutex mt;
 
     std:: queue <msg_text> qSend;
     bool reconnect = true;
@@ -731,11 +756,11 @@ int main()
             //std::thread cinConsoleThread(cinFromConsole,socket,ref(qSend),ref(pool));
 
             pool.enqueue([&]{
-                cinFromConsole(socket,ref(qSend),pool);
+                cinFromConsole(socket,ref(qSend),pool,mt);
             });
-            std::thread sendMsgThread(sendMsg,socket,ref(qSend),ref(timeoutList));
-            std::thread recvThread(recvMsg,bufrcv,socket,ref(timeoutList));
-            std::thread timeoutThr(timeoutThread,socket,ref(timeoutList),ref(qSend));
+            std::thread sendMsgThread(sendMsg,socket,ref(qSend),ref(timeoutList),ref(mt));
+            std::thread recvThread(recvMsg,bufrcv,socket,ref(timeoutList),ref(mt));
+            std::thread timeoutThr(timeoutThread,socket,ref(timeoutList),ref(qSend),ref(mt));
 
 
 
