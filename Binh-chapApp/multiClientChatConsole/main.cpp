@@ -28,7 +28,7 @@
 #define PORT "8096"
 #define TIME_OUT 10
 #define MAX_FILE_TXT 1024
-#define NUM_CLIENT 10
+#define NUM_CLIENT 15
 //------------variable check-------------------------------------------------------------
 std::mutex mtx;
 int stop = 0;
@@ -127,7 +127,7 @@ void recvMsg(unsigned char *buf,
                         }
                         mt.unlock();
                     }
-                    if(msg_get.msg.length() > 0){
+                    if(msg_get.type_msg == MSG){
                         std::cout <<"==> Nguoi nhan "<<name<< "> " << msg_get.msg << std::endl;
 
                         //ping pong msg
@@ -135,6 +135,7 @@ void recvMsg(unsigned char *buf,
                         if(found != std::string::npos){
                             std::string data = msg_get.msg.substr(found+1,msg_get.msg.size());
                             mt.lock();
+                            usleep(1000);
                             if(count == 0){
 
                                 msgSend.type_msg = MSG;
@@ -421,7 +422,7 @@ void cinFromConsole(std::queue<nodeConsole>&csQ,std::mutex &mt,
             }
             else if(strcmp(userInput.c_str(),"*") == 0){
 
-
+                sleep(2);
 
                 std::ifstream ifs("../readFile/a.txt", std::ios::binary|std::ios::ate);
                 std::ifstream::pos_type pos = ifs.tellg();
@@ -787,7 +788,7 @@ int main()
                     unsigned char * bufrcv; // buf for recv data
                     std::string userInput;
                     std::vector <timeoutSend> timeoutList;
-                    thread_pool pool(10);
+                    thread_pool pool(5);
                     std:: queue <msg_text> qSend;
                     int count = 0;
                     bool connectttt = true;

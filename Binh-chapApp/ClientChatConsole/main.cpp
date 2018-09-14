@@ -24,8 +24,8 @@
 #include "threadpool.h"
 #include <fstream>
 //---------------------------------------------------------------------------------------
-#define HOST "10.42.0.187"
-#define PORT "1500"
+#define HOST "10.42.0.126"
+#define PORT "8096"
 #define TIME_OUT 10
 #define MAX_FILE_TXT 1024
 //------------variable check-------------------------------------------------------------
@@ -58,7 +58,7 @@ void recvMsg(unsigned char *buf,int sockfd,
             struct msg_text msg_get;
             struct msg_text msg_rsp;
             HandleMsg handleMsg;
-            std::cout<<"bytes recv "<<bytesRecv<<"\n";
+            //std::cout<<"bytes recv "<<bytesRecv<<"\n";
 
             std::vector<unsigned char> buffer;
             buffer.insert(buffer.end(),&buf[0],&buf[bytesRecv]);
@@ -90,7 +90,7 @@ void recvMsg(unsigned char *buf,int sockfd,
                         //std::vector<timeoutSend>::iterator it;
                     }
                     if(msg_get.type_msg == RSP){
-                        std::cout << "id rps> " << msg_get.ID << std::endl;
+                        //std::cout << "id rps> " << msg_get.ID << std::endl;
 
                         usleep(1000);
 
@@ -113,9 +113,16 @@ void recvMsg(unsigned char *buf,int sockfd,
                         }
                         mt.unlock();
                     }
-                    if(msg_get.msg.length() > 0){
+                    //mt.lock();
+                    if(msg_get.type_msg == MSG){
                         std::cout << "> " << msg_get.msg << std::endl;
+                        //std::cout << "ID> " << msg_get.ID << std::endl;
                     }
+//                    if(msg_get.type_msg != MSG && msg_get.msg.length() >0){
+//                        std::cout << "==> " << msg_get.msg << std::endl;
+//                        std::cout << "ID ==> " << msg_get.ID << std::endl;
+//                    }
+                    //mt.unlock();
 
                 }
             }
@@ -397,16 +404,16 @@ void cinFromConsole(int socket,
 
     //std::to_string(42);
     //test 1000 msg/s
-    //    sleep(15);
-    //    for(int i = 0;i <1000; i++){
-    //        msgSend.type_msg = MSG;
-    //        msgSend.msg.assign("all/hello "+std::to_string(i));
-    //        mtx.lock();
-    //        msgQ.push(msgSend);
-    //        usleep(1000);//1ms
-    //        mtx.unlock();
+        sleep(10);
+        for(int i = 0;i <1000; i++){
+            msgSend.type_msg = MSG;
+            msgSend.msg.assign("all/hello "+std::to_string(i));
+            mtx.lock();
+            msgQ.push(msgSend);
+            usleep(1000);//1ms
+            mtx.unlock();
 
-    //    }
+        }
 
     while(stop!=1){
         fd_set read;
@@ -551,7 +558,7 @@ void sendMsg(int socket,std::queue<msg_text>&msgQ,
 
             //                printf("%c",msgQ.front().msg.c_str()[i]);
             //            }
-            std::cout<<"\n";
+            //std::cout<<"\n";
             int numSend = sendall(socket,buf,buferSize);
             if(numSend == 0){
 

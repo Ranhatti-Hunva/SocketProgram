@@ -159,11 +159,12 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
 
                                    msgQueue &qSend,std::mutex &mt){
 
-
+    //mt.lock();
     struct timeval tv;
     //std::unique_ptr<char>a(new char[10]);
     //std::unique_ptr<char> bufSend (new char[2048]);
     char * bufSend = new char [4096];
+    //char bufSend[4096];
     memset(bufSend,0,4096);
 
     //std::unique_ptr<char> dataMsg (new char(strlen(msg)));
@@ -223,6 +224,9 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
         unsigned char buffer[msgSend.msg.length()+9];
         HandleMsg handleMsg;
         handleMsg.packed_msg(msgSend,buffer);
+
+
+
 
         int count = 0;
         if(strcmp(nameClient,"all")==0){
@@ -331,7 +335,7 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
     else{
         std::cout<<"wrong format\n";
     }
-
+    //mt.unlock();
 }
 
 

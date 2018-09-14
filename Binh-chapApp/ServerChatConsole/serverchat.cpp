@@ -50,7 +50,6 @@ int ServerChat::createSocket(){
     }
     this->fdmax = sockfd;
     FD_ZERO(&read_fds);
-    //FD_ZERO(&read_fds);
     FD_SET(sockfd, &read_fds);
     freeaddrinfo(servinfo);
 
@@ -90,9 +89,8 @@ int ServerChat::sendall(int socket,unsigned char *buf, int len)
 //---------------------------------------------------------------------------------------
 
 void ServerChat::sendThread( msgQueue &qSend, std::mutex &mt){
-    timeval tv;
-    tv.tv_sec = 0;
-    tv.tv_usec = 5000;
+
+
     while(1){
 
         if(!qSend.isEmpty()){
@@ -287,7 +285,7 @@ void ServerChat::recvData(int serverFd,
                     //clientFds.erase(position);
                     clientFds.push_back(newfd);
                 }
-                std::cout<<"size ==> "<<clientFds.size()<<"\n";
+                //std::cout<<"size ==> "<<clientFds.size()<<"\n";
                 //locker.unlock();
 
                 long arg = fcntl(newfd, F_GETFL, NULL);
@@ -382,55 +380,6 @@ void ServerChat::recvData(int serverFd,
         }
     }
 }
-//---------------------------------------------------------------------------------------
-// xu li Qrecv
-
-//void ServerChat::handlQrecv(std::vector <nodeRecv> &dataRecv){
-//    if(!dataRecv.empty()){
-
-//        for( std::vector< nodeRecv >::const_iterator b = dataRecv.begin(), e = dataRecv.end(); b != e; ++b )
-//        {
-//            std::vector<unsigned char> buffer;
-//            buffer.insert(buffer.end(),b.base()->data.begin(),b.base()->data.end());
-//            while(buffer.size()>0){
-
-
-//                msg_text recvMsg,rspMsg;
-//                recvMsg.socketfd = b.base()->socket;
-//                bool is_success = handlMsg.unpacked_msg(recvMsg,buffer);
-
-//                if(!is_success){
-//                    break;
-//                }
-//                else{
-
-//                    //enQ thread pool
-//                    if(recvMsg.type_msg != RSP){
-
-//                        rspMsg.ID = recvMsg.ID;
-//                        rspMsg.type_msg = RSP;
-//                        rspMsg.socketfd = b.base()->socket;
-//                        //std::cout <<"=>------- "<<rspMsg.ID<<"\n";
-//                        //poolThread.enqueue([rspMsg]{
-//                            clientQSend(rspMsg);
-//                        //});
-//                    }
-
-//                    //poolThread.enqueue([=,&clientLst,&timeoutList,&qSend,&mt]{
-//                    //    clientQRecv(recvMsg,clientLst,timeoutList,qSend,mt);
-//                    //});
-
-//                }
-//            }//end while
-
-////            std::cout <<"\nsk => "<< b.base()->socket << "\n";
-////            std::cout<<"size => "<< b.base()->data.size() << "\n";
-
-//        }
-//    }
-//}
-
-
 
 //---------------------------------------------------------------------------------------
 // wait connect
@@ -443,7 +392,7 @@ void ServerChat::recvData(int serverFd,
 //           client chat all -> broadcast msg to all client online
 //           client chat personal -> send msg if online else store msg in file
 
-
+/*
 void ServerChat::mainLoop(){
 
 
@@ -542,22 +491,22 @@ void ServerChat::mainLoop(){
                         //std::cout<<sizeof(buf)<<std::endl;
 
                         // add data vao Qrecv
-                        /* tach data thanh cac truong length - id destination - data
-                            check client online -> xu li du lieu
-                            offline -> luu vao array client
-                        */
+                        // tach data thanh cac truong length - id destination - data
+                        // check client online -> xu li du lieu
+                        // offline -> luu vao array client
+
 
                         // xuli du lieu
-                        /* lay name client -> gan vao data -> dia chi dich
-                           -> chuyen qua Qsend
-                        */
+                        // lay name client -> gan vao data -> dia chi dich
+                        // -> chuyen qua Qsend
+
 
                         // add data vao Qsend
-                        /* tach data = data + dia chi dich
-                           xac dinh dia chi dich
-                           truyen tung nguoi hoac truyen tat ca
-                           send -> deQmsg
-                        */
+                        // tach data = data + dia chi dich
+                        // xac dinh dia chi dich
+                        // truyen tung nguoi hoac truyen tat ca
+                        // send -> deQmsg
+
 
                         std::vector<unsigned char> buffer;
                         buffer.insert(buffer.end(),&buf.get()[0],&buf.get()[nbytes]);
@@ -650,7 +599,7 @@ void ServerChat::mainLoop(){
     }    // end while -close socket
 
 }
-
+*/
 //---------------------------------------------------------------------------------------
 void* ServerChat::get_in_addr(struct sockaddr *sa){
     if(sa->sa_family == AF_INET){
