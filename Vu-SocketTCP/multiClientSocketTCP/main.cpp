@@ -37,7 +37,7 @@ int main()
 
     for(int i=0; i< NUM_CLIENT; i++)
     {
-        user_name[i] = "C" + std::to_string(i);
+        user_name[i] = "D" + std::to_string(i);
         end_connection[i] = false;
         is_error[i] = false;
         reconnect[i] = true;
@@ -116,7 +116,7 @@ int main()
                         threads.enqueue([&]()
                         {
                             client_helper.send_msg(msg_wts, client_oder, client_fd);
-                        });                        
+                        });
 
                         threads.enqueue([&]()
                         {
@@ -131,6 +131,8 @@ int main()
                         // Listern incomming message
                         while(!end_connection[client_oder])
                         {
+//                            client_helper.send_msg(msg_wts, client_oder, client_fd);
+
                             int is_disconnect = client_helper.recv_msg(client_fd, msg_wts, threads, client_oder);
                             if(is_disconnect < 0)
                             {
@@ -139,6 +141,7 @@ int main()
                                 sleep(2);
                                 break;
                             }
+                            usleep(1);
                         };
 
                         if (is_error[client_oder])

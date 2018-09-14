@@ -315,6 +315,13 @@ int TCPserver::recv_msg(int server_fd, client_list& client_socket_list, msg_queu
             }
             else
             {
+                printf("=> Byte recv() on socket %d: %d ", this->client_fds[i], num_data);
+                for (int i =0; i<num_data ; i++)
+                {
+                    cout << (int)recv_buffer[i] << " ";
+                };
+                cout << endl;
+
                 q_element element;
                 element.content.insert(element.content.end(), &recv_buffer[0], &recv_buffer[num_data]);
                 element.socket_fd = this->client_fds[i];
@@ -672,6 +679,13 @@ void TCPserver::buffer_analyser(bool& end_connection, msg_queue& msg_wts, client
                 std::vector<unsigned char> buffer_all;
                 buffer_all = host_msg->buffer;
                 buffer_all.insert(buffer_all.end(), element.content.begin(), element.content.end());
+
+                printf("=> Get msg %d from q_rec: ", buffer_all.size());
+                for(unsigned long i=0; i< buffer_all.size(); i++)
+                {
+                    cout<< (int) buffer_all[i] << " ";
+                };
+                cout<<endl;
 
                 host_msg->buffer.clear();
 

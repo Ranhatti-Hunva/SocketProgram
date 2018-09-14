@@ -52,10 +52,12 @@ OBJECTS_DIR   = ./
 
 SOURCES       = ../ClientChatConsole/main.cpp \
 		../ClientChatConsole/clientchat.cpp \
-		../ClientChatConsole/handlemsg.cpp 
+		../ClientChatConsole/handlemsg.cpp \
+		../ClientChatConsole/md5.cpp 
 OBJECTS       = main.o \
 		clientchat.o \
-		handlemsg.o
+		handlemsg.o \
+		md5.o
 DIST          = /Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/spec_pre.prf \
 		/Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/qdevice.pri \
 		/Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/device_config.prf \
@@ -193,6 +195,7 @@ DIST          = /Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/spec_pre.prf
 		/Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/qt_config.prf \
 		/Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/macx-clang/qmake.conf \
 		/Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/spec_post.prf \
+		../ClientChatConsole/.qmake.stash \
 		/Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/exclusive_builds.prf \
 		/Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/mac/sdk.prf \
 		/Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/toolchain.prf \
@@ -215,9 +218,12 @@ DIST          = /Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/spec_pre.prf
 		/Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/yacc.prf \
 		/Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/lex.prf \
 		../ClientChatConsole/ClientChatConsole.pro clientchat.h \
-		handlemsg.h ../ClientChatConsole/main.cpp \
+		handlemsg.h \
+		md5.h \
+		threadpool.h ../ClientChatConsole/main.cpp \
 		../ClientChatConsole/clientchat.cpp \
-		../ClientChatConsole/handlemsg.cpp
+		../ClientChatConsole/handlemsg.cpp \
+		../ClientChatConsole/md5.cpp
 QMAKE_TARGET  = ClientChatConsole
 DESTDIR       = 
 TARGET        = ClientChatConsole
@@ -371,6 +377,7 @@ Makefile: ../ClientChatConsole/ClientChatConsole.pro /Users/cpu11806/Qt/5.11.1/c
 		/Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/qt_config.prf \
 		/Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/macx-clang/qmake.conf \
 		/Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/spec_post.prf \
+		.qmake.stash \
 		/Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/exclusive_builds.prf \
 		/Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/mac/sdk.prf \
 		/Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/toolchain.prf \
@@ -531,6 +538,7 @@ Makefile: ../ClientChatConsole/ClientChatConsole.pro /Users/cpu11806/Qt/5.11.1/c
 /Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/qt_config.prf:
 /Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/macx-clang/qmake.conf:
 /Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/spec_post.prf:
+.qmake.stash:
 /Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/exclusive_builds.prf:
 /Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/mac/sdk.prf:
 /Users/cpu11806/Qt/5.11.1/clang_64/mkspecs/features/toolchain.prf:
@@ -576,6 +584,7 @@ clean: compiler_clean
 
 distclean: clean 
 	-$(DEL_FILE) $(TARGET) 
+	-$(DEL_FILE) .qmake.stash
 	-$(DEL_FILE) Makefile
 
 
@@ -598,7 +607,9 @@ compiler_clean:
 ####### Compile
 
 main.o: ../ClientChatConsole/main.cpp ../ClientChatConsole/clientchat.h \
-		../ClientChatConsole/handlemsg.h
+		../ClientChatConsole/handlemsg.h \
+		../ClientChatConsole/md5.h \
+		../ClientChatConsole/threadpool.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o main.o ../ClientChatConsole/main.cpp
 
 clientchat.o: ../ClientChatConsole/clientchat.cpp ../ClientChatConsole/clientchat.h
@@ -606,6 +617,9 @@ clientchat.o: ../ClientChatConsole/clientchat.cpp ../ClientChatConsole/clientcha
 
 handlemsg.o: ../ClientChatConsole/handlemsg.cpp ../ClientChatConsole/handlemsg.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o handlemsg.o ../ClientChatConsole/handlemsg.cpp
+
+md5.o: ../ClientChatConsole/md5.cpp ../ClientChatConsole/md5.h
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o md5.o ../ClientChatConsole/md5.cpp
 
 ####### Install
 

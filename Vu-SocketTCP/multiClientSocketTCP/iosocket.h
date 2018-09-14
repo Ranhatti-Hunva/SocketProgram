@@ -12,7 +12,7 @@
 #include <sys/event.h>
 #include <unistd.h>
 
-#define NUM_CLIENT 3
+#define NUM_CLIENT 25
 
 #include "msgqueue.h"
 #include "tcphelper.h"

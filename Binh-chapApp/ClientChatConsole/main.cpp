@@ -24,8 +24,8 @@
 #include "threadpool.h"
 #include <fstream>
 //---------------------------------------------------------------------------------------
-#define HOST "10.42.0.127"
-#define PORT "8096"
+#define HOST "10.42.0.187"
+#define PORT "1500"
 #define TIME_OUT 10
 #define MAX_FILE_TXT 1024
 //------------variable check-------------------------------------------------------------
@@ -516,7 +516,7 @@ void sendMsg(int socket,std::queue<msg_text>&msgQ,std::vector<timeoutSend>&timeo
     struct timeval tp;
     while(stop!=1){
         if(!msgQ.empty()){
-            int buferSize = msgQ.front().msg.length()+10;
+            int buferSize = msgQ.front().msg.length()+9;
 
             unsigned char *buf = new unsigned char [buferSize];
             memset(buf,0,buferSize);
