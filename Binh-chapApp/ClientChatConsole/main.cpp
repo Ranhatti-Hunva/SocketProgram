@@ -24,7 +24,7 @@
 #include "threadpool.h"
 #include <fstream>
 //---------------------------------------------------------------------------------------
-#define HOST "10.42.0.126"
+#define HOST "localhost"
 #define PORT "8096"
 #define TIME_OUT 10
 #define MAX_FILE_TXT 1024
@@ -118,10 +118,10 @@ void recvMsg(unsigned char *buf,int sockfd,
                         std::cout << "> " << msg_get.msg << std::endl;
                         //std::cout << "ID> " << msg_get.ID << std::endl;
                     }
-//                    if(msg_get.type_msg != MSG && msg_get.msg.length() >0){
-//                        std::cout << "==> " << msg_get.msg << std::endl;
-//                        std::cout << "ID ==> " << msg_get.ID << std::endl;
-//                    }
+                    //                    if(msg_get.type_msg != MSG && msg_get.msg.length() >0){
+                    //                        std::cout << "==> " << msg_get.msg << std::endl;
+                    //                        std::cout << "ID ==> " << msg_get.ID << std::endl;
+                    //                    }
                     //mt.unlock();
 
                 }
@@ -280,10 +280,10 @@ bool compareHashvalue(std::vector<fileNode>&fileList,std::string fileName){
             int len;
             std::string str = ReadAllBytes(fileName.c_str(),&len);
 
-//            std::cout<<"name 1 "<<fileName.c_str()<<"\n";
-//            std::cout<<"name 2 "<<fileList[i].filePath<<"\n";
-//            std::cout<<"hash 1 "<<fileList[i].hashVa<<"\n";
-//            std::cout<<"hash 2 "<<md5(str)<<"\n";
+            //            std::cout<<"name 1 "<<fileName.c_str()<<"\n";
+            //            std::cout<<"name 2 "<<fileList[i].filePath<<"\n";
+            //            std::cout<<"hash 1 "<<fileList[i].hashVa<<"\n";
+            //            std::cout<<"hash 2 "<<md5(str)<<"\n";
 
             if(strcmp(fileList[i].hashVa.c_str(),md5(str).c_str()) == 0){
                 return true;
@@ -404,16 +404,16 @@ void cinFromConsole(int socket,
 
     //std::to_string(42);
     //test 1000 msg/s
-        sleep(10);
-        for(int i = 0;i <1000; i++){
-            msgSend.type_msg = MSG;
-            msgSend.msg.assign("all/hello "+std::to_string(i));
-            mtx.lock();
-            msgQ.push(msgSend);
-            usleep(1000);//1ms
-            mtx.unlock();
+//    sleep(10);
+//    for(int i = 0;i <1000; i++){
+//        msgSend.type_msg = MSG;
+//        msgSend.msg.assign("all/hello "+std::to_string(i));
+//        mtx.lock();
+//        msgQ.push(msgSend);
+//        usleep(1000);//1ms
+//        mtx.unlock();
 
-        }
+//    }
 
     while(stop!=1){
         fd_set read;
