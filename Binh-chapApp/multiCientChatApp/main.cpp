@@ -57,101 +57,108 @@ void recvMsg(unsigned char *buf,
              int &count,int &stopTr
              ){
     msg_text msgSend;
+    fd_set listener;
+    FD_ZERO(&listener);
+    FD_SET(sockfd,&listener);
     while(stopTr!=1){
+        if(select(sockfd+1,&listener, nullptr,nullptr,nullptr) == -1){
+            perror("select");
+        }
+        if(FD_ISSET(sockfd,&listener)){
+            buf = new unsigned char [3072];
+            memset(buf,0,3072);
 
-        buf = new unsigned char [2048];
-        memset(buf,0,2048);
+            int bytesRecv = recv(sockfd,buf,3072,0);
+            if(bytesRecv >0){
+                struct msg_text msg_get;
+                struct msg_text msg_rsp;
+                HandleMsg handleMsg;
+                //std::cout<<"bytes recv "<<bytesRecv<<"\n";
 
-        int bytesRecv = recv(sockfd,buf,2048,0);
-        if(bytesRecv >0){
-            struct msg_text msg_get;
-            struct msg_text msg_rsp;
-            HandleMsg handleMsg;
-            //std::cout<<"bytes recv "<<bytesRecv<<"\n";
-
-            std::vector<unsigned char> buffer;
-            buffer.insert(buffer.end(),&buf[0],&buf[bytesRecv]);
-
-            while(buffer.size()>0){
-                bool is_success = handleMsg.unpacked_msg(msg_get,buffer);
-                if(!is_success && (buffer.size() > 0)){
-
-                    break;
-                }
-                else{
-                    if(is_success && msg_get.type_msg == RSP && msg_get.ID == loginId){
-                        //                        std::cout << "Login success\n";
-                        //                        std::cout << "Start chat now" <<"\n";
-                        //                        std::cout  << "press '#' to exit\n";
+                std::vector<unsigned char> buffer;
+                buffer.insert(buffer.end(),&buf[0],&buf[bytesRecv]);
+                while(buffer.size()>0){
+                    bool is_success = handleMsg.unpacked_msg(msg_get,buffer);
+                    if(!is_success && (buffer.size() > 0)){
+                        break;
                     }
-                    if(is_success && msg_get.type_msg != RSP){
-                        unsigned char buffer[10];
-                        msg_rsp.ID = msg_get.ID;
-                        msg_rsp.type_msg = RSP;
-                        msg_rsp.msg.clear();
-                        handleMsg.packed_msg(msg_rsp,buffer);
-                        mt.lock();
-                        msgQ.push(msg_rsp);
-                        mt.unlock();
-                    }
-                    if(msg_get.type_msg == RSP){
-                        //std::cout << "id rps> " << msg_get.ID << std::endl;
-                        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-
-                        mt.lock();
-                        std::vector<timeoutSend>::iterator it;
-
-                        // tim va xoa msg trong Q timeout khi nhan respond
-                        if(!timeoutQ.empty()){
-                            it = std::find_if(timeoutQ.begin(),timeoutQ.end(),
-                                              [=] (timeoutSend const& f) {
-                                return (f.msgId == msg_get.ID);
-                            });
-                            //tim thay va xoa
-                            if (it != timeoutQ.end()){
-                                timeoutQ.erase(it);
-                            }
+                    else{
+                        if(is_success && msg_get.type_msg == RSP && msg_get.ID == loginId){
+                            //                        std::cout << "Login success\n";
+                            //                        std::cout << "Start chat now" <<"\n";
+                            //                        std::cout  << "press '#' to exit\n";
                         }
-                        mt.unlock();
-                    }
-                    if(msg_get.type_msg == MSG){
-                        std::cout <<"==> Nguoi nhan "<<name<< "> " << msg_get.msg << std::endl;
-
-                        //ping pong msg
-                        std::size_t found = msg_get.msg.find_first_of(">");
-                        if(found != std::string::npos){
-                            std::string data = msg_get.msg.substr(found+1,msg_get.msg.size());
+                        if(is_success && msg_get.type_msg != RSP){
+                            uint8_t buffer[9];
+                            msg_rsp.ID = msg_get.ID;
+                            msg_rsp.type_msg = RSP;
+                            msg_rsp.msg.clear();
+                            handleMsg.packed_msg(msg_rsp,buffer);
                             mt.lock();
+                            msgQ.push(msg_rsp);
+                            mt.unlock();
+                        }
+                        if(msg_get.type_msg == RSP){
+                            //std::cout << "id rps> " << msg_get.ID << std::endl;
                             std::this_thread::sleep_for(std::chrono::milliseconds(1));
-                            //usleep(1000);
-                            if(count == 0){
-                                msgSend.type_msg = MSG;
-                                msg_get.msg[found] = '/';
-                                //std::cout<<"msg "<<msg_get.msg<<"\n";
-                                msgSend.msg.assign(msg_get.msg);
-                                msgQ.push(msgSend);
-                            }else{
-                                count--;
-                                if(count < 0){
-                                    count = 0;
+
+                            mt.lock();
+                            std::vector<timeoutSend>::iterator it;
+
+                            // tim va xoa msg trong Q timeout khi nhan respond
+                            if(!timeoutQ.empty()){
+                                it = std::find_if(timeoutQ.begin(),timeoutQ.end(),
+                                                  [=] (timeoutSend const& f) {
+                                    return (f.msgId == msg_get.ID);
+                                });
+                                //tim thay va xoa
+                                if (it != timeoutQ.end()){
+                                    timeoutQ.erase(it);
                                 }
                             }
                             mt.unlock();
                         }
+                        if(msg_get.type_msg == MSG){
+                            std::cout <<"==> Nguoi nhan "<<name<< "> " << msg_get.msg << std::endl;
+
+                            //ping pong msg
+                            std::size_t found = msg_get.msg.find_first_of(">");
+                            if(found != std::string::npos){
+                                std::string data = msg_get.msg.substr(found+1,msg_get.msg.size());
+                                mt.lock();
+                                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                                if(count == 0){
+                                    msgSend.type_msg = MSG;
+                                    msg_get.msg[found] = '/';
+                                    //std::cout<<"msg "<<msg_get.msg<<"\n";
+                                    msgSend.msg.assign(msg_get.msg);
+                                    msgQ.push(msgSend);
+                                }else{
+                                    count--;
+                                    if(count < 0){
+                                        count = 0;
+                                    }
+                                }
+                                mt.unlock();
+                            }
+                        }
                     }
                 }
             }
+            if(bytesRecv == 0){
+                std::cout << "> server is close \n";
+                close(sockfd);
+                stop = 1;
+                break;
+            }
+            if ((bytesRecv == -1) && ((errno == EAGAIN)|| (errno == EWOULDBLOCK))){
+                perror("=> Message is not gotten complete !!");
+            }
+            if(stop != 0){
+                break;
+            }
+            delete[] buf;
         }
-        if(bytesRecv == 0){
-            std::cout << "> server is close \n";
-            close(sockfd);
-            stop = 1;
-            break;
-        }
-        if(stop != 0){
-            break;
-        }
-        delete[] buf;
     }
 }
 //------------Read All Bytes in file ----------------------------------------------------
@@ -221,14 +228,13 @@ void sendMsgInFile(std::string name,
         msg_text msgSend;
         msgSend.type_msg = MSG;
         msgSend.msg.clear();
-        msgSend.msg.assign(name + "/" +pChars);
+        msgSend.msg.assign(name + "/" +pChars,0,name.size() + 1 + sizeof (pChars));
 
         std::cout<<"==> Size  "<< msgSend.msg.size() <<"\n";
         msgQ.push(msgSend);
         count++;
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
-        //delete []pChars;
         mt.unlock();
     }
     ifs.close();
@@ -358,35 +364,76 @@ void cinFromConsole(std::queue<nodeConsole>&csQ,std::mutex &mt,
             }
             else if(strcmp(userInput.c_str(),"*") == 0){
 
-                std::this_thread::sleep_for(std::chrono::seconds(5));
+                std::this_thread::sleep_for(std::chrono::seconds(3));
 
                 std::ifstream ifs("../readFile/a.txt", std::ios::binary|std::ios::ate);
                 std::ifstream::pos_type pos = ifs.tellg();
                 ifs.seekg(0, std::ios::beg);
                 int block = 128; // 1/8 KB
                 int numberBlock = (pos/block) + 1;
-
+                std::string arrFile[numberBlock];
                 for(int i = 0; i < numberBlock; i++){
-                    //mt.lock();
                     char pChars[block] ;
+                    arrFile[i] = new char[block];
                     memset(pChars,0,block);
+                    arrFile[i].clear();
                     ifs.read(pChars,block);
-                    //mt.unlock();
-                    //std::cout<<"block   "<< i << "-----------------\n"<<std::string(pChars,0,1024)<<"\n";
-
-                    for(int i = 0; i < NUM_CLIENT; i++){
-                        mt.lock();
-                        nodeConsole node;
-                        node.name.assign("B"+std::to_string(i));
-                        node.data.assign("V"+std::to_string(i)+"/"+pChars);
-                        csQ.push(node);
-                        //std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                        mt.unlock();
-                    }
-                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                    arrFile[i].assign(pChars,0,sizeof (pChars));
                 }
                 ifs.close();
                 userInput.clear();
+
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+                for(int i = 0; i < numberBlock; i++){
+                    for(int j = 0; j < NUM_CLIENT; j++){
+                        mt.lock();
+                        nodeConsole node;
+                        node.name.assign("B"+std::to_string(j));
+                        node.data.assign("V"+std::to_string(j)+"/"+arrFile[i]);
+                        csQ.push(node);
+                        mt.unlock();
+                    }
+                    std::cout<<"=======><====== "<<csQ.size()<<"\n";
+                    //std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                    //                    std::cout<<"==>"<< arrFile[i]<<"\n";
+                    //                    for(int j =0 ; j <arrFile[i].size();j++){
+                    //                        std::cout<<(uint)arrFile[i][j]<<" ";
+                    //                    }
+                    //                    std::cout<<"\n==> Size " << arrFile[i].size()<<"\n";
+                }
+
+//                                std::this_thread::sleep_for(std::chrono::seconds(5));
+
+//                                std::ifstream ifs("../readFile/a.txt", std::ios::binary|std::ios::ate);
+//                                std::ifstream::pos_type pos = ifs.tellg();
+//                                ifs.seekg(0, std::ios::beg);
+//                                int block = 128; // 1/8 KB
+//                                int numberBlock = (pos/block) + 1;
+
+//                                for(int i = 0; i < numberBlock; i++){
+//                                    //mt.lock();
+//                                    char pChars[block] ;
+//                                    memset(pChars,0,block);
+//                                    ifs.read(pChars,block);
+//                                    //mt.unlock();
+//                                    //std::cout<<"block   "<< i << "-----------------\n"<<std::string(pChars,0,1024)<<"\n";
+
+//                                    for(int j = 0; j < NUM_CLIENT; j++){
+//                                        mt.lock();
+//                                        nodeConsole node;
+//                                        node.name.assign("B"+std::to_string(j));
+//                                        node.data.assign("V"+std::to_string(j)+"/"+pChars);
+//                                        csQ.push(node);
+//                                        mt.unlock();
+//                                        //std::cout<<"==>  i "<<i<<"\n";
+//                                        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+//                                    }
+//                                    std::cout<<"=======><====== "<<i<<" "<<csQ.size()<<"\n";
+
+//                                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+//                                }
+//                                ifs.close();
+//                                userInput.clear();
 
             }
             else if(userInput.size() >0){
@@ -432,12 +479,17 @@ void inputForThread(int socket,
     tv.tv_usec = 500000;
 
     bool stopFile = false;
-
+    nodeConsole node;
     while(stopTr!=1){
+        // loi data race csQ empty
+        usleep(100000);
         if(!csQ.empty()){
-            nodeConsole node;
+           //mt.lock();
             node.name.assign(csQ.front().name);
             node.data.assign(csQ.front().data);
+//            node.name = csQ.front().name;
+//            node.data = csQ.front().data;
+           // mt.unlock();
             if(strcmp(node.name.c_str(),name.c_str()) == 0){
                 if(strcmp(node.data.c_str(),"#") == 0){
                     mt.lock();
@@ -464,6 +516,7 @@ void inputForThread(int socket,
                 }
                 else if(node.data.size() >0){
                     mt.lock();
+                    //std::cout<<"============= "<<csQ.size()<<"\n";
                     msgSend.type_msg = MSG;
                     msgSend.msg.assign(node.data);
                     msgQ.push(msgSend);
@@ -474,6 +527,7 @@ void inputForThread(int socket,
                 csQ.pop();
                 mt.unlock();
             }
+
         }
     }
 }
@@ -516,6 +570,7 @@ void sendMsg(int socket,std::queue<msg_text>&msgQ,
                 node.msgId = msgQ.front().ID;
                 gettimeofday(&tp, nullptr);
                 node.time = tp.tv_sec*1000 +tp.tv_usec/1000;
+                //std::cout<<"--------------- "<<msgQ.size()<<"\n";
                 timeoutQ.push_back(node);
                 msgQ.pop();
                 std::this_thread::sleep_for(std::chrono::milliseconds(2));
@@ -523,8 +578,9 @@ void sendMsg(int socket,std::queue<msg_text>&msgQ,
             else{
                 perror("send: ");
             }
-            mt.unlock();
             delete []buf;
+            mt.unlock();
+
         }
     }
 }
@@ -666,7 +722,7 @@ int main()
     });
     while(1){
         for(int i = 0; i< NUM_CLIENT; i++){
-            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
             if(reconnectClient[i] == true){
                 //std::cout << "==> co vao ano " << reconnectClient[i] << "\n";
                 threads_master.enqueue([=](){
@@ -679,49 +735,53 @@ int main()
                     thread_pool pool(5);
                     std:: queue <msg_text> qSend;
                     int count = 0;
-                    bool connectttt = true;
+                    //bool connect = true;
                     int stopTr = 0;
                     std::string hashStr;
-                    while(connectttt && (stop != 1 || stopTr == 0)){
+                    //while(connectttt && (stop != 1 || stopTr == 0)){
 
-                        msgSend.msg.assign(name[i]);
-                        unsigned char buffer[msgSend.msg.length()+9];
-                        HandleMsg handleMsg;
-                        handleMsg.packed_msg(msgSend,buffer);
+                    msgSend.msg.assign(name[i]);
+                    unsigned char buffer[msgSend.msg.length()+9];
+                    HandleMsg handleMsg;
+                    handleMsg.packed_msg(msgSend,buffer);
 
-                        //connect to server
-                        int socket = client.timeoutConnect(HOST,PORT,TIME_OUT);
+                    //connect to server
+                    int socket = client.timeoutConnect(HOST,PORT,TIME_OUT);
 
-                        //connect success
-                        if(socket > 0){
-                            //send name user to server for login
-                            int num = send(socket,buffer,sizeof(buffer),0);
-                            loginId = msgSend.ID;
-                            std::cout<<"client "<<name[i]<<" connect to server\n";
+                    //connect success
+                    if(socket > 0){
+                        //send name user to server for login
+                        int num = send(socket,buffer,sizeof(buffer),0);
+                        loginId = msgSend.ID;
+                        mtex.lock();
+                        std::cout<<"client "<<name[i]<<" connect to server\n";
+                        mtex.unlock();
+                        //socket non-blocking mode
+                        long arg = fcntl(socket, F_GETFL, NULL);
+                        arg |= O_NONBLOCK;
+                        fcntl(socket, F_SETFL, arg);
+                        // main thread for send msg
 
-                            //socket non-blocking mode
-                            long arg = fcntl(socket, F_GETFL, NULL);
-                            arg |= O_NONBLOCK;
-                            fcntl(socket, F_SETFL, arg);
-                            // main thread for send msg
+                        // press # for logout
 
-                            // press # for logout
+                        pool.enqueue([=,&qSend,&pool,&hashStr,&count,&stopTr]{
+                            inputForThread(socket,qSend,pool,csList,mtex,name[i],hashStr,count,stopTr);
+                        });
 
-                            pool.enqueue([=,&qSend,&pool,&hashStr,&count,&stopTr]{
-                                inputForThread(socket,qSend,pool,csList,mtex,name[i],hashStr,count,stopTr);
-                            });
+                        pool.enqueue([&]{
+                            recvMsg(bufrcv,socket,ref(timeoutList),name[i],hashStr,qSend,mtex,count,stopTr);
+                        });
+                        //                            pool.enqueue([&]{
+                        //                                timeoutThread(socket,ref(timeoutList),ref(qSend));
+                        //                            });
+                        pool.enqueue([&]{
+                            sendMsg(socket,qSend,ref(timeoutList),ref(mtex),std::ref(stopTr));
+                        });
+                        //std::thread sendMsgThread(sendMsg,socket,ref(qSend),ref(timeoutList),ref(mtex),std::ref(stopTr));
 
-                            pool.enqueue([&]{
-                                recvMsg(bufrcv,socket,ref(timeoutList),name[i],hashStr,qSend,mtex,count,stopTr);
-                            });
-                            //                            pool.enqueue([&]{
-                            //                                timeoutThread(socket,ref(timeoutList),ref(qSend));
-                            //                            });
-                            std::thread sendMsgThread(sendMsg,socket,ref(qSend),ref(timeoutList),ref(mtex),std::ref(stopTr));
-
-                            sendMsgThread.join();
-                        }
+                        //sendMsgThread.join();
                     }
+                    //}
                 });
                 reconnectClient[i] = false;
             }
