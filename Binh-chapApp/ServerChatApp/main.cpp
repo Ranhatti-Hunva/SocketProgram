@@ -51,9 +51,10 @@ int main()
         poolThr.enqueue([&]{
             server.timeoutThread(ref(client),ref(timeoutList));
         });
-
+        while(1){
         server.recvData(socket,ref(client),poolThr,ref(timeoutList),qSend,mtx);
-
+        usleep(1000);
+        }
         server.cleanUp();
     }
     return 0;

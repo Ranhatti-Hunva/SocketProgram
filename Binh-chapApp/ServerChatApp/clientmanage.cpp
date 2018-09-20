@@ -3,7 +3,6 @@
 //---------------------------------------------------------------------------------------
 ClientManage::ClientManage()
 {
-
 }
 
 //------login client---------------------------------------------------------------------
@@ -122,13 +121,11 @@ void ClientManage::sendOffClient(msgQueue &qSend,
                         node.msgID = msgSend.ID;
                         qSend.pushQ(node);
                     }
-
                 }
                 infile.close();
                 std::ofstream ofs;
                 ofs.open(filename, std::ofstream::out | std::ofstream::trunc);
                 ofs.close();
-
             }
             clientList[i].readfile = false;
         }
@@ -197,7 +194,6 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
         if(strcmp(nameClient,"all") == 0){
             for(int i = 0; i < MAX_CLIENT ; i++){
                 if(clientList[i].status == true && clientList[i].socketfd != socketfd){
-
                     addQsend(clientList[i].socketfd ,
                              timeoutList,qSend,mt,
                              buffer,sizeof (buffer),msgSend.ID);
@@ -210,10 +206,7 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
 
             if (it != mapClient.end()){
                 int posClient = it->second;
-                //std::cout<<"pos "<<posClient<<"\n";
-
                 if(clientList[posClient].status == true){
-
                     addQsend(clientList[posClient].socketfd,
                              timeoutList,qSend,mt,
                              buffer,sizeof (buffer),msgSend.ID);
@@ -225,9 +218,7 @@ void ClientManage::sendMsgToClient(std::vector <clientNode> &clientList,
             else{
                 std::cout<< "client does not exist\n";
             }
-
         }
-
         delete [] dataMsg;
         delete [] bufSend;
     }
@@ -243,10 +234,8 @@ void ClientManage::addQsend (int socketfd,
                              std::mutex &mt,
                              uint8_t *buffer,
                              uint lenMsg,
-                             uint ID)
-{
+                             uint ID){
     struct timeval tv;
-
     mt.lock();
 
     sendNode node;
@@ -259,12 +248,10 @@ void ClientManage::addQsend (int socketfd,
     qSend.pushQ(node);
 
     gettimeofday(&tv, nullptr);
-
     timeoutNode to;
     to.timeout = tv.tv_sec*1000 + tv.tv_usec/1000 ;
     to.msgID = ID;
     to.socket = socketfd;
-
     timeoutList.push_back(to);
 
     mt.unlock();

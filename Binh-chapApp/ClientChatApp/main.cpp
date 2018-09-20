@@ -49,7 +49,6 @@ void recvMsg(unsigned char *buf,int sockfd,
     long int timeRSP = 0;
     struct timeval tp;
     while(stop!=1){
-
         buf = new unsigned char [4096];
         memset(buf,0,4096);
 
@@ -68,12 +67,9 @@ void recvMsg(unsigned char *buf,int sockfd,
             while(buffer.size()>0){
                 bool is_success = handleMsg.unpacked_msg(msg_get,buffer);
                 if(!is_success && (buffer.size() > 0)){
-
                     break;
                 }
                 else{
-
-
                     if((is_success) && (msg_get.type_msg == RSP) && (msg_get.ID == loginId)){
                         std::cout << "Login success\n";
                         std::cout << "Start chat now" <<"\n";
@@ -127,6 +123,7 @@ void recvMsg(unsigned char *buf,int sockfd,
             break;
         }
         delete[] buf;
+        usleep(10000);
     }
 }
 //------------Read All Bytes in file ----------------------------------------------------
@@ -295,6 +292,7 @@ void sendFileThread(std::string name,
                 }
             }
         }
+        usleep(1000);
     }
 }
 
@@ -312,16 +310,16 @@ void cinFromConsole(int socket,
     bool stopFile = false;
 
     //test 1000 msg/s
-//    sleep(10);
-//    for(int i = 0;i <1000; i++){
-//        msgSend.type_msg = MSG;
-//        msgSend.msg.assign("all/hello "+std::to_string(i));
-//        mtx.lock();
-//        msgQ.push(msgSend);
-//        usleep(1000);//1ms
-//        mtx.unlock();
+    //    sleep(10);
+    //    for(int i = 0;i <1000; i++){
+    //        msgSend.type_msg = MSG;
+    //        msgSend.msg.assign("all/hello "+std::to_string(i));
+    //        mtx.lock();
+    //        msgQ.push(msgSend);
+    //        usleep(1000);//1ms
+    //        mtx.unlock();
 
-//    }
+    //    }
 
     while(stop!=1){
         fd_set read;
@@ -364,6 +362,7 @@ void cinFromConsole(int socket,
                 userInput.clear();
             }
         }
+        usleep(1000);
     }
 }
 //----------------------------------------------------------------------------------------
@@ -419,6 +418,7 @@ void sendMsg(int socket,std::queue<msg_text>&msgQ,
             delete []buf;
             mt.unlock();
         }
+        usleep(1000);
     }
 }
 //-----send ping-------------------------------------------------------------------------
@@ -496,6 +496,7 @@ void timeoutThread(int socket,std::vector<timeoutSend>&timeoutQ,
                 mt.unlock();
             }
         }
+        usleep(1000);
     }
 }
 
@@ -527,6 +528,7 @@ bool isReconnect(std::vector<timeoutSend>&timeoutQ){
         else{
             std::cout << "Your command is not found, try again!!!\n";
         }
+        usleep(1000);
     }
 }
 
@@ -593,6 +595,7 @@ int main(){
             timeoutThr.join();
         }
         reconnect = isReconnect(ref(timeoutList));
+        usleep(1000);
     }
     return 0;
 }

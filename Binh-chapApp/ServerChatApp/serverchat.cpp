@@ -108,6 +108,7 @@ void ServerChat::sendThread( msgQueue &qSend, std::mutex &mt){
             }
             mt.unlock();
         }
+        usleep(1000);
     }
 }
 
@@ -184,6 +185,7 @@ void ServerChat::timeoutThread(std::vector <clientNode> &clientList,
                 timeoutList.erase(timeoutList.begin());
             }
         }
+        usleep(1000);
     }
 }
 
@@ -214,15 +216,15 @@ void ServerChat::clientQSend2(int ID, int socket,std::mutex &mt){
     mt.lock();
     send(msgHandle.socketfd,buffer,9,0);
     mt.unlock();
-//    switch(msgHandle.type_msg){
-//    case RSP:
-//        unsigned char buffer[9];
-//        grapMsg.packed_msg(msgHandle,buffer);
-//        send(msgHandle.socketfd,buffer,9,0);
-//        break;
-//    default:
-//        break;
-//    }
+    //    switch(msgHandle.type_msg){
+    //    case RSP:
+    //        unsigned char buffer[9];
+    //        grapMsg.packed_msg(msgHandle,buffer);
+    //        send(msgHandle.socketfd,buffer,9,0);
+    //        break;
+    //    default:
+    //        break;
+    //    }
 }
 //---------------------------------------------------------------------------------------
 void ServerChat::recvData(int serverFd,                          
@@ -231,117 +233,117 @@ void ServerChat::recvData(int serverFd,
                           std::vector<timeoutNode> &timeoutList,
                           msgQueue &qSend,std::mutex &mt){
 
-    while(1){
-        fd_set listener = this->read_fds;
-        struct timeval tv;
-        tv.tv_usec = 0;
-        tv.tv_sec = 1;
+    //while(1){
+    fd_set listener = this->read_fds;
+    struct timeval tv;
+    tv.tv_usec = 0;
+    tv.tv_sec = 1;
 
-        if(select(this->fdmax+1,&listener, nullptr,nullptr,&tv) == -1){
-            perror("select");
+    if(select(this->fdmax+1,&listener, nullptr,nullptr,&tv) == -1){
+        perror("select");
+    }
+
+    for(int i = 0 ; i < clientFds.size();i++){
+        if(!FD_ISSET(clientFds[i],&read_fds) && skExist != -1){
+            close(clientFds[i]);
+            std::cout<<"socket "<<clientFds[i]<<" closed\n";
+            std::vector<int>::iterator position = std::find(clientFds.begin(), clientFds.end(), skExist);
+            clientFds.erase(position);
+            skExist = -1;
         }
+    }
 
-        for(int i = 0 ; i < clientFds.size();i++){
-            if(!FD_ISSET(clientFds[i],&read_fds) && skExist != -1){
-                close(clientFds[i]);
-                std::cout<<"socket "<<clientFds[i]<<" closed\n";
-                std::vector<int>::iterator position = std::find(clientFds.begin(), clientFds.end(), skExist);
-                clientFds.erase(position);
-                skExist = -1;
+    if(FD_ISSET(serverFd,&listener)){
+        addrlen = sizeof remoteaddr;
+        newfd = accept(sockfd,(struct sockaddr *)&remoteaddr,&addrlen);
+        if(newfd == -1){
+            perror("accept");
+        } else {
+            FD_SET(newfd,&read_fds);
+
+            //add socket to clientFds list
+            std::vector<int>::iterator position = std::find(clientFds.begin(), clientFds.end(), newfd);
+            if(position == clientFds.end()){
+                clientFds.push_back(newfd);
             }
-        }
 
-        if(FD_ISSET(serverFd,&listener)){
-            addrlen = sizeof remoteaddr;
-            newfd = accept(sockfd,(struct sockaddr *)&remoteaddr,&addrlen);
-            if(newfd == -1){
-                perror("accept");
-            } else {
-                FD_SET(newfd,&read_fds);
+            long arg = fcntl(newfd, F_GETFL, NULL);
+            arg |= O_NONBLOCK;
+            fcntl(newfd, F_SETFL, arg);
 
-                //add socket to clientFds list
-                std::vector<int>::iterator position = std::find(clientFds.begin(), clientFds.end(), newfd);
-                if(position == clientFds.end()){
-                    clientFds.push_back(newfd);
-                }
-
-                long arg = fcntl(newfd, F_GETFL, NULL);
-                arg |= O_NONBLOCK;
-                fcntl(newfd, F_SETFL, arg);
-
-                // assign fdmax = socket of newfd
-                if( newfd > this->fdmax){
-                    this->fdmax = newfd;
-                }
-
-                const char * network_name = inet_ntop(remoteaddr.ss_family,
-                                                      get_in_addr((struct sockaddr*)&remoteaddr)
-                                                      ,remoteIP,INET6_ADDRSTRLEN);
-
-                std::cout <<"new connection from " << network_name <<
-                            " on socket" << newfd << "\n";
+            // assign fdmax = socket of newfd
+            if( newfd > this->fdmax){
+                this->fdmax = newfd;
             }
+
+            const char * network_name = inet_ntop(remoteaddr.ss_family,
+                                                  get_in_addr((struct sockaddr*)&remoteaddr)
+                                                  ,remoteIP,INET6_ADDRSTRLEN);
+
+            std::cout <<"new connection from " << network_name <<
+                        " on socket" << newfd << "\n";
         }
+    }
 
-        for(int i = 0 ; i < clientFds.size();i++){
-            if(FD_ISSET(clientFds[i],&listener)){
-                std::unique_ptr<uint8_t> buf (new uint8_t[16*1024]);
+    for(int i = 0 ; i < clientFds.size();i++){
+        if(FD_ISSET(clientFds[i],&listener)){
+            std::unique_ptr<uint8_t> buf (new uint8_t[16*1024]);
 
-                if((nbytes = recv(clientFds[i],buf.get(),16*1024,0))<=0){
+            if((nbytes = recv(clientFds[i],buf.get(),16*1024,0))<=0){
 
-                    if ((nbytes == -1) && ((errno == EAGAIN)|| (errno == EWOULDBLOCK))){
-                        perror("=> Message is not gotten complete !!");
-                    }
-
-                    if(nbytes == 0){
-                        // close connect
-                        // chuyen trang thai stt sang offline
-                        for(int j = 0 ; j < MAX_CLIENT ; j++){
-                            if(clientLst[j].socketfd == clientFds[i] && clientLst[j].status == true){
-                                clientLst[j].status = false;
-                                break;
-                            }
-                        }
-                        std::cout << "socket "<< clientFds[i] << " closed\n";
-                        close(clientFds[i]);
-                        FD_CLR(clientFds[i],&read_fds);
-                    }
-
+                if ((nbytes == -1) && ((errno == EAGAIN)|| (errno == EWOULDBLOCK))){
+                    perror("=> Message is not gotten complete !!");
                 }
-                else{
-                    std::vector<uint8_t> buffer;
-                    buffer.insert(buffer.end(),&buf.get()[0],&buf.get()[nbytes]);
 
-                    while(buffer.size()>0){
-                        msg_text recvMsg,rspMsg;
-                        recvMsg.socketfd = clientFds[i];
-                        bool is_success = handlMsg.unpacked_msg(recvMsg,buffer);
-
-                        if(!is_success){
+                if(nbytes == 0){
+                    // close connect
+                    // chuyen trang thai stt sang offline
+                    for(int j = 0 ; j < MAX_CLIENT ; j++){
+                        if(clientLst[j].socketfd == clientFds[i] && clientLst[j].status == true){
+                            clientLst[j].status = false;
                             break;
                         }
-                        else{
-                            //enQ thread pool
-                            if(recvMsg.type_msg != RSP){
-                                int id = recvMsg.ID;
-                                int sk = clientFds[i];
-                                rspMsg.ID = recvMsg.ID;
-                                rspMsg.type_msg = RSP;
-                                rspMsg.msg.clear();
-                                rspMsg.socketfd = clientFds[i];
-                                poolThread.enqueue([=,&mt]{
-                                    clientQSend2(id,sk,mt);
-                                });
-                            }
-                            poolThread.enqueue([=,&clientLst,&timeoutList,&qSend,&mt]{
-                                clientQRecv(recvMsg,clientLst,timeoutList,qSend,mt);
+                    }
+                    std::cout << "socket "<< clientFds[i] << " closed\n";
+                    close(clientFds[i]);
+                    FD_CLR(clientFds[i],&read_fds);
+                }
+
+            }
+            else{
+                std::vector<uint8_t> buffer;
+                buffer.insert(buffer.end(),&buf.get()[0],&buf.get()[nbytes]);
+
+                while(buffer.size()>0){
+                    msg_text recvMsg,rspMsg;
+                    recvMsg.socketfd = clientFds[i];
+                    bool is_success = handlMsg.unpacked_msg(recvMsg,buffer);
+
+                    if(!is_success){
+                        break;
+                    }
+                    else{
+                        //enQ thread pool
+                        if(recvMsg.type_msg != RSP){
+                            int id = recvMsg.ID;
+                            int sk = clientFds[i];
+                            rspMsg.ID = recvMsg.ID;
+                            rspMsg.type_msg = RSP;
+                            rspMsg.msg.clear();
+                            rspMsg.socketfd = clientFds[i];
+                            poolThread.enqueue([=,&mt]{
+                                clientQSend2(id,sk,mt);
                             });
                         }
-                    }//end while
-                }
+                        poolThread.enqueue([=,&clientLst,&timeoutList,&qSend,&mt]{
+                            clientQRecv(recvMsg,clientLst,timeoutList,qSend,mt);
+                        });
+                    }
+                }//end while
             }
         }
     }
+    //}
 }
 
 //---------------------------------------------------------------------------------------
